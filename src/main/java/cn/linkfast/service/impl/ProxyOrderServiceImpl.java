@@ -41,8 +41,8 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     @Value("${api.ipv.prod_url}")
     private String prodUrl;
 
-    @Value("${api.ipv.path.product_query}")
-    private String productQueryPath;
+    @Value("${api.ipv.path.order_info}")
+    private String orderQueryPath;
 
     private String baseUrl; // 动态确定的基础地址
 
@@ -64,7 +64,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
 
 
         // 拼接完整的请求 URL
-        String fullUrl = baseUrl + productQueryPath;
+        String fullUrl = baseUrl + orderQueryPath;
 
         // 业务参数转成最终的请求参数
         Map<String, Object> finalRequest = apiPacketUtil.pack(params);
@@ -72,8 +72,9 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         // 发送 HTTP 请求，返回的是 HTTP 响应体（Response Body）的全文内容
         String responseStr = sendPost(fullUrl, finalRequest);
 
-        return processResponse(responseStr);
-
+        ProxyOrder order = processResponse(responseStr);
+        if (order == null) return new OrderUpdateResultDTO();
+        return proxyOrderDAO.saveOrder(order);
     }
 
     private String sendPost(String url, Map<String, Object> body) throws Exception {
@@ -84,19 +85,18 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         }
     }
 
-    private OrderUpdateResultDTO processResponse(String responseStr) throws Exception {
+    private ProxyOrder processResponse(String responseStr) throws Exception {
         JsonNode root = objectMapper.readTree(responseStr);
         if (root.path("code").asInt() == 200) {
             String encryptedData = root.path("data").asText();
-            if (encryptedData == null || encryptedData.isEmpty()) return new OrderUpdateResultDTO(0, 0);
+            if (encryptedData == null || encryptedData.isEmpty()) return null;
 
             // 解密响应数据
             String decryptedJson = apiPacketUtil.unpack(encryptedData);
             log.info("接口返回数据解密成功: {}", decryptedJson);
             // 将解密后的 JSON 转换为 ProxyProduct 列表
-            ProxyOrder order = objectMapper.readValue(decryptedJson, new TypeReference<>() {
+            return objectMapper.readValue(decryptedJson, new TypeReference<>() {
             });
-            return proxyOrderDAO.saveOrder(order);
         } else {
             throw new RuntimeException("API错误: " + root.path("msg").asText());
         }
