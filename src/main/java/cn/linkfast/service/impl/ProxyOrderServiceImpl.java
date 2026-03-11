@@ -1,6 +1,7 @@
 package cn.linkfast.service.impl;
 
 import cn.linkfast.dao.ProxyOrderDAO;
+import cn.linkfast.dto.OrderUpdateResultDTO;
 import cn.linkfast.entity.ProxyOrder;
 import cn.linkfast.service.ProxyOrderService;
 import cn.linkfast.utils.ApiPacketUtil;
@@ -59,7 +60,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     }
 
     @Override
-    public int syncOrderDetails(Map<String, Object> params) throws Exception {
+    public OrderUpdateResultDTO syncOrderDetails(Map<String, Object> params) throws Exception {
 
 
         // 拼接完整的请求 URL
@@ -68,7 +69,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         // 业务参数转成最终的请求参数
         Map<String, Object> finalRequest = apiPacketUtil.pack(params);
 
-        // 发送 HTTP 请求
+        // 发送 HTTP 请求，返回的是 HTTP 响应体（Response Body）的全文内容
         String responseStr = sendPost(fullUrl, finalRequest);
 
         return processResponse(responseStr);
@@ -83,11 +84,11 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         }
     }
 
-    private int processResponse(String responseStr) throws Exception {
+    private OrderUpdateResultDTO processResponse(String responseStr) throws Exception {
         JsonNode root = objectMapper.readTree(responseStr);
         if (root.path("code").asInt() == 200) {
             String encryptedData = root.path("data").asText();
-            if (encryptedData == null || encryptedData.isEmpty()) return 0;
+            if (encryptedData == null || encryptedData.isEmpty()) return new OrderUpdateResultDTO(0, 0);
 
             // 解密响应数据
             String decryptedJson = apiPacketUtil.unpack(encryptedData);

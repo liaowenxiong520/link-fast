@@ -1,6 +1,8 @@
 package cn.linkfast.controller;
 
 import cn.linkfast.common.Result;
+import cn.linkfast.dto.OrderUpdateResultDTO;
+import cn.linkfast.service.ProxyOrderService;
 import cn.linkfast.service.ProxyProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ import java.util.Map;
 public class ProxyCallbackController {
 
     private final ProxyProductService proxyProductService;
+    private final ProxyOrderService proxyOrderService;
 
     /**
      * 第三方通知回调地址
@@ -55,6 +58,18 @@ public class ProxyCallbackController {
                 log.error("<<< 产品 {} 同步失败：{}", no, e.getMessage());
                 return Result.error("产品 " + no + " 同步失败：" + e.getMessage());
             }
+        } else if ("order".equalsIgnoreCase(type)) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("orderNo", no);
+            params.put("pageSize", 100);
+            try {
+                OrderUpdateResultDTO result = proxyOrderService.syncOrderDetails(params);
+                log.info("<<< 订单 {} 同步成功，更新订单 {} 行，更新实例 {} 行",
+                        no, result.getProxyOrderUpdatedRows(), result.getProxyInstanceUpdatedRows());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
         }
 
         // 返回给第三方，告知已收到通知

@@ -32,8 +32,9 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+
     /**
-     * 自定义 RowMapper 手动处理 JSON 转换
+     * 自定义 RowMapper 手动处理 JSON 转换，查询代理产品列表用到
      */
     private final RowMapper<ProxyProduct> proxyProductRowMapper = (rs, rowNum) -> {
         ProxyProduct p = new ProxyProduct();

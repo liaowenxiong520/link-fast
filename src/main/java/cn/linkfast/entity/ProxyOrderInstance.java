@@ -3,6 +3,7 @@ package cn.linkfast.entity;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 订单实例子表
@@ -27,7 +28,10 @@ public class ProxyOrderInstance {
     private BigDecimal flowBalance;// 剩余流量(MB)
     private Integer status;       // 实例状态
     private Integer renew;        // 是否自动续费（已废弃）
-    private String bridges;       // 桥地址列表（JSON存储）
+
+
+    private List<String> bridges;       // 桥地址列表（JSON存储）
+
     private Date openAt;          // 实例开通时间
     private Date renewAt;         // 最后成功续费时间
     private Date releaseAt;       // 实例释放成功时间
@@ -36,4 +40,6 @@ public class ProxyOrderInstance {
     private String projectId;     // 项目code
     private Date createTime;
     private Date updateTime;
+
+
 }
