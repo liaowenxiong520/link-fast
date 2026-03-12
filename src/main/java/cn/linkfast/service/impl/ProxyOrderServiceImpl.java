@@ -77,7 +77,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         return proxyOrderDAO.saveOrder(order);
     }
 
-    private String sendPost(String url, Map<String, Object> body) throws Exception {
+    public String sendPost(String url, Map<String, Object> body) throws Exception {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpPost post = new HttpPost(url);
             post.setEntity(new StringEntity(objectMapper.writeValueAsString(body), ContentType.APPLICATION_JSON));

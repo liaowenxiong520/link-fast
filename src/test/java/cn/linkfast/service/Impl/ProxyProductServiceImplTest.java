@@ -1,8 +1,9 @@
-package cn.linkfast.service;
+package cn.linkfast.service.Impl;
 
 import cn.linkfast.common.PageResult;
 import cn.linkfast.config.AppConfig;
 import cn.linkfast.dto.ProxyProductQueryDTO;
+import cn.linkfast.service.ProxyProductService;
 import cn.linkfast.vo.ProxyProductVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @ContextConfiguration(classes = {AppConfig.class})
 // 测试结束后自动回滚事务，防止污染数据库（如果 Service 有 @Transactional）
 //@Transactional
-public class ProxyProductServiceTest {
+public class ProxyProductServiceImplTest {
 
     @Autowired
     private ProxyProductService productService;
