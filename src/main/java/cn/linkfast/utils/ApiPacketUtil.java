@@ -39,7 +39,7 @@ public class ApiPacketUtil {
     }
 
     /**
-     * 将业务参数包装并加密成最终的请求 Map
+     * 将业务参数加密、编码，并封装成最终的请求 Map
      */
     public Map<String, Object> pack(Object businessParams) throws Exception {
         // 1. 业务对象转 JSON

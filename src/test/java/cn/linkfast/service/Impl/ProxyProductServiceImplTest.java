@@ -34,7 +34,7 @@ public class ProxyProductServiceImplTest {
         // 1. 构建查询条件
         ProxyProductQueryDTO dto = new ProxyProductQueryDTO();
         dto.setCountryCode("US");
-        dto.setPage(1);
+        dto.setPageNum(1);
         dto.setPageSize(10);
 
         // 2. 调用业务逻辑
@@ -80,7 +80,7 @@ public class ProxyProductServiceImplTest {
         ProxyProductQueryDTO queryDTO = new ProxyProductQueryDTO();
         queryDTO.setCountryCode("USA"); // 必填，对应 SQL 中的 WHERE country_code = ?
         queryDTO.setCityCode("USA000000"); // 必填，对应 SQL 中的 WHERE city_code = ?
-        queryDTO.setPage(1);            // 第 1 页
+        queryDTO.setPageNum(1);            // 第 1 页
         queryDTO.setPageSize(10);       // 每页 10 条
 
         System.out.println(">>> 开始测试获取代理产品列表...");

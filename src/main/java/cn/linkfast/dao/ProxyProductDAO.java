@@ -14,4 +14,12 @@ public interface ProxyProductDAO {
     List<ProxyProduct> findProxyProductList(ProxyProductSearchCondition condition);
 
     int countProxyProduct(ProxyProductSearchCondition condition);
+
+    /**
+     * 根据产品编号查询单个代理产品
+     *
+     * @param productNo 产品编号
+     * @return 代理产品信息
+     */
+    ProxyProduct findProxyProduct(String productNo);
 }

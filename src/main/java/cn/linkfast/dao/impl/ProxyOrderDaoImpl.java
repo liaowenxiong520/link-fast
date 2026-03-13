@@ -5,6 +5,7 @@ import cn.linkfast.dto.OrderUpdateResultDTO;
 import cn.linkfast.dto.ProxyOrderSearchCondition;
 import cn.linkfast.entity.ProxyOrder;
 import cn.linkfast.entity.ProxyOrderInstance;
+import cn.linkfast.entity.ProxyOrderItem;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,23 +29,23 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public OrderUpdateResultDTO saveOrder(ProxyOrder order) {
-        String orderSql = "INSERT INTO proxy_order (order_no, app_order_no, user_id, order_type, status, product_count, amount, has_refund, instance_total) " + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) " + "ON DUPLICATE KEY UPDATE status=VALUES(status), amount=VALUES(amount), has_refund=VALUES(has_refund), instance_total=VALUES(instance_total)";
-
+    public OrderUpdateResultDTO updateProxyOrder(ProxyOrder order) {
+        // 改为插入或更新（主键冲突时更新指定字段）
+        String orderSql = "INSERT INTO proxy_order (order_no, app_order_no, user_id, order_type, status, total_quantity, amount, has_refund, instance_total) " + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) " + "ON DUPLICATE KEY UPDATE status=VALUES(status), amount=VALUES(amount), has_refund=VALUES(has_refund), instance_total=VALUES(instance_total), order_type=VALUES(order_type), order_no=VALUES(order_no)";
         List<Object> params = new ArrayList<>();
         params.add(order.getOrderNo());
         params.add(order.getAppOrderNo());
         params.add(order.getUserId());
         params.add(order.getOrderType());
         params.add(order.getStatus());
-        params.add(order.getProductCount());
+        params.add(order.getTotalQuantity());
         params.add(order.getAmount());
         params.add(order.getHasRefund());
         params.add(order.getInstanceTotal());
 
-        // 1. 保存或更新主表数据
+        // 1. 插入或更新主表数据
         int proxyOrderUpdatedRows = jdbcTemplate.update(orderSql, params.toArray());
-        log.info(">>> 订单已成功持久化，单号: {}", order.getOrderNo());
+        log.info(">>> 订单已插入或更新，单号: {}，影响行数: {}", order.getOrderNo(), proxyOrderUpdatedRows);
 
         // 2. 从 order 对象中获取实例列表进行批量处理
         List<ProxyOrderInstance> instances = order.getInstances();
@@ -159,4 +160,54 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
             return "[]";
         }
     }
+
+    /**
+     * 回写第三方返回的 orderNo 和 amount
+     */
+    public int updateProxyOrder(String appOrderNo, String orderNo, java.math.BigDecimal amount) {
+        String sql = "UPDATE proxy_order SET order_no=?, amount=? WHERE app_order_no=?";
+        return jdbcTemplate.update(sql, orderNo, amount, appOrderNo);
+    }
+
+    /**
+     * 保存订单主数据和项目数据到数据库
+     * 用于开通代理等新建订单场景
+     *
+     * @param order 包含主表信息和 items 列表的订单对象
+     * @return 保存的订单的 appOrderNo（便于后续业务使用）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public String saveProxyOrder(ProxyOrder order) {
+
+        // 1. 插入主表数据（纯插入，不做更新）
+        String orderSql = "INSERT INTO proxy_order (order_no, app_order_no, user_id, order_type, status, total_quantity, amount, has_refund, instance_total, create_time, update_time) " + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        List<Object> params = new ArrayList<>();
+        params.add(order.getOrderNo());
+        params.add(order.getAppOrderNo());
+        params.add(order.getUserId());
+        params.add(order.getOrderType());
+        params.add(order.getStatus());
+        params.add(order.getTotalQuantity());
+        params.add(order.getAmount());
+        params.add(order.getHasRefund());
+        params.add(order.getInstanceTotal());
+
+        int proxyOrderInsertedRows = jdbcTemplate.update(orderSql, params.toArray());
+        log.info(">>> 订单已新建，渠道商订单号: {}，影响行数: {}", order.getAppOrderNo(), proxyOrderInsertedRows);
+
+        // 2. 获取并保存订单项目数据
+        List<ProxyOrderItem> items = order.getItems();
+        if (items != null && !items.isEmpty()) {
+            String itemSql = "INSERT INTO proxy_order_item (app_order_no, product_no, proxy_type, use_type, protocol, use_limit, " + "area_code, country_code, state_code, city_code, detail, cost_price, retail_price, " + "ip_type, isp_type, net_type, duration, unit, band_width, band_width_price, max_band_width, flow, " + "cpu, memory, supplier_code, ip_count, ip_duration, parent_no, proxy_everytime_change, " + "proxy_global_random) " + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+            List<Object[]> batchArgs = items.stream().map(item -> new Object[]{order.getAppOrderNo(), item.getProductNo(), item.getProxyType(), item.getUseType(), item.getProtocol(), item.getUseLimit(), item.getAreaCode(), item.getCountryCode(), item.getStateCode(), item.getCityCode(), item.getDetail(), item.getCostPrice(), item.getRetailPrice(), item.getIpType(), item.getIspType(), item.getNetType(), item.getDuration(), item.getUnit(), item.getBandWidth(), item.getBandWidthPrice(), item.getMaxBandWidth(), item.getFlow(), item.getCpu(), item.getMemory(), item.getSupplierCode(), item.getIpCount(), item.getIpDuration(), item.getParentNo(), item.getProxyEverytimeChange(), item.getProxyGlobalRandom()}).collect(Collectors.toList());
+
+            int[] results = jdbcTemplate.batchUpdate(itemSql, batchArgs);
+            log.info(">>> 订单 {} 的项目已成功新建，数量: {}", order.getAppOrderNo(), items.size());
+        }
+
+        log.info(">>> 订单保存完成，appOrderNo: {}", order.getAppOrderNo());
+        return order.getAppOrderNo();
+    }
+
 }

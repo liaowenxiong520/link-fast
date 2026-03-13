@@ -1,8 +1,8 @@
 package cn.linkfast.dao.impl;
 
 import cn.linkfast.dao.ProxyProductDAO;
-import cn.linkfast.entity.ProxyProduct;
 import cn.linkfast.dto.ProxyProductSearchCondition;
+import cn.linkfast.entity.ProxyProduct;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -254,6 +254,19 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
             log.error("JSON解析失败，返回空集合: {}", json, e);
             return (T) new ArrayList<>();
         }
+    }
+
+    /**
+     * 根据产品编号查询单个代理产品
+     *
+     * @param productNo 产品编号
+     * @return 代理产品信息
+     */
+    @Override
+    public ProxyProduct findProxyProduct(String productNo) {
+        String sql = "SELECT * FROM proxy_product WHERE product_no = ?";
+        List<ProxyProduct> results = jdbcTemplate.query(sql, proxyProductRowMapper, new Object[]{productNo});
+        return results.isEmpty() ? null : results.get(0);
     }
 
 

@@ -22,7 +22,7 @@ public class ProxyOrder {
     private Integer orderType;    // 订单类型: 1=新建, 2=续费, 3=释放
     private Integer status;       // 状态: 1=待处理, 2=处理中, 3=处理成功, 4=处理失败, 5=部分完成
     @JsonProperty("count")
-    private Integer productCount; // 购买数量
+    private Integer totalQuantity; // 购买总数量
     private BigDecimal amount;    // 总价
     @JsonProperty("refund")
     private Integer hasRefund;    // 是否存在退费: 0=无, 1=存在
@@ -33,4 +33,6 @@ public class ProxyOrder {
 
     // 封装订单下的所有实例明细
     private List<ProxyOrderInstance> instances;
+    // 封装订单下的所有商品明细
+    private List<ProxyOrderItem> items;
 }

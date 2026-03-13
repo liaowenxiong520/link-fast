@@ -2,6 +2,7 @@ package cn.linkfast.service.Impl;
 
 import cn.linkfast.config.AppConfig;
 import cn.linkfast.dao.ProxyOrderDAO;
+import cn.linkfast.dao.ProxyProductDAO;
 import cn.linkfast.dto.OrderUpdateResultDTO;
 import cn.linkfast.service.impl.ProxyOrderServiceImpl;
 import cn.linkfast.utils.ApiPacketUtil;
@@ -39,11 +40,13 @@ public class ProxyOrderIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper; // 自动注入 AppConfig 中定义的 ObjectMapper
     private ProxyOrderServiceImpl proxyOrderServiceSpy;
+    @Autowired
+    private ProxyProductDAO proxyProductDAO;
 
     @BeforeEach
     void setUp() {
         // 1. 手动构造 Service 实例
-        ProxyOrderServiceImpl realService = new ProxyOrderServiceImpl(proxyOrderDAO, objectMapper, apiPacketUtil);
+        ProxyOrderServiceImpl realService = new ProxyOrderServiceImpl(proxyOrderDAO, objectMapper, apiPacketUtil, proxyProductDAO);
 
         // 2. 将实例包装为 Mockito Spy
         proxyOrderServiceSpy = spy(realService);
@@ -67,6 +70,7 @@ public class ProxyOrderIntegrationTest {
                 {
                   "orderNo": "P2026031200010005",
                   "appOrderNo": "D2026031200886699",
+                  "userId": "999999",
                   "type": 1,
                   "status": 3,
                   "count": 2,
@@ -97,7 +101,7 @@ public class ProxyOrderIntegrationTest {
                       "bridges": ["10.0.0.1:8080", "10.0.0.2:8080"],
                       "openAt": "2026-03-12 09:30:00",
                       "renewAt": "2026-03-12 09:30:00",
-                        "releaseAt":"2026-03-12 09:35:00",
+                      "releaseAt":"2026-03-12 09:35:00",
                       "productNo": "PRO-STATIC-101",
                       "extendIp": "192.168.1.102,192.168.1.103"
                     },
@@ -146,7 +150,7 @@ public class ProxyOrderIntegrationTest {
         params.put("orderNo", "P202603111200001");
 
         // 调用 spy 对象的方法
-        // 流程：syncOrderDetails -> (Spy拦截)sendPost -> (真实)processResponse -> (Mock拦截)unpack -> (真实)DAO.saveOrder
+        // 流程：syncOrderDetails -> (Spy拦截)sendPost -> (真实)processResponse -> (Mock拦截)unpack -> (真实)DAO.updateProxyOrder
         OrderUpdateResultDTO result = proxyOrderServiceSpy.syncOrderDetails(params);
 
         // --- 4. 验证结果 ---

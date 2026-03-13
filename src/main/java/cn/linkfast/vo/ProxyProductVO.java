@@ -21,6 +21,8 @@ public class ProxyProductVO implements Serializable {
     private Integer proxyType;     // 代理类型 (建议后期转为 String 的“中文描述”)
     private String protocol;       // 协议类型 (HTTP/SOCKS5)
     private String detail;         // 详情描述
+    private Integer unit;         // 单位
+    private Integer duration;      // 最小时长
     private BigDecimal costPrice;  // 成本价
     private Integer inventory;     // 库存数量
 }
