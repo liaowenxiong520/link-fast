@@ -14,6 +14,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ProxyProduct {
 
+    private Long id;
     private String productNo;
     private String productName;
     private Integer proxyType;

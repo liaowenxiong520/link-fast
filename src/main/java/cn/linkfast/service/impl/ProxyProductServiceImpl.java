@@ -63,14 +63,11 @@ public class ProxyProductServiceImpl implements ProxyProductService {
         ProxyProductSearchCondition condition = new ProxyProductSearchCondition();
         condition.setCountryCode(queryDto.getCountryCode());
         condition.setCityCode(queryDto.getCityCode());
+        condition.setProxyType(queryDto.getProxyType());
 
-        // 处理分页逻辑：只有当前端传了分页参数时才计算
-        if (queryDto.getPageNum() != null && queryDto.getPageSize() != null) {
-            condition.setLimit(queryDto.getPageSize());
-            // 公式：offset = (当前页码 - 1) * 每页条数
-            int offset = (queryDto.getPageNum() - 1) * queryDto.getPageSize();
-            condition.setOffset(Math.max(offset, 0)); // 防止负数
-        }
+        condition.setLimit(queryDto.getPageSize());
+        int offset = (queryDto.getPageNum() - 1) * queryDto.getPageSize();
+        condition.setOffset(Math.max(offset, 0));
         return condition;
     }
 

@@ -5,6 +5,7 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.Date;
 
 /**
  * 代理订单明细表实体类
@@ -229,4 +230,6 @@ public class ProxyOrderItem implements Serializable {
      * 产品是共享还是独享
      */
     private Integer productType;
+    private Date createTime;
+    private Date updateTime;
 }

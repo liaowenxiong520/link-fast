@@ -16,14 +16,21 @@ public class OrderUpdateResultDTO {
      */
     private int proxyOrderUpdatedRows;
     /**
-     * 订单子表更新条数
+     * 代理实例更新条数
      */
     private int proxyInstanceUpdatedRows;
 
+    /**
+     * 订单明细表更新条数
+     */
+    private int proxyOrderItemUpdatedRows;
+
     // 基础构造器（仅包含核心字段）
-    public OrderUpdateResultDTO(int proxyOrderUpdatedRows, int proxyInstanceUpdatedRows) {
+    public OrderUpdateResultDTO(int proxyOrderUpdatedRows, int proxyInstanceUpdatedRows, int proxyOrderItemUpdatedRows) {
         this.proxyOrderUpdatedRows = proxyOrderUpdatedRows;
         this.proxyInstanceUpdatedRows = proxyInstanceUpdatedRows;
+        this.proxyOrderItemUpdatedRows = proxyOrderItemUpdatedRows;
+
     }
     // 默认构造器（无参）
     public OrderUpdateResultDTO() {

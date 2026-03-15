@@ -7,12 +7,14 @@ import cn.linkfast.dto.OrderUpdateResultDTO;
 import cn.linkfast.dto.ProxyOrderCreateDTO;
 import cn.linkfast.dto.ProxyOrderQueryDTO;
 import cn.linkfast.dto.ProxyOrderSearchCondition;
+import cn.linkfast.entity.ProxyInstance;
 import cn.linkfast.entity.ProxyOrder;
 import cn.linkfast.entity.ProxyOrderItem;
 import cn.linkfast.entity.ProxyProduct;
+import cn.linkfast.exception.BusinessException;
 import cn.linkfast.service.ProxyOrderService;
 import cn.linkfast.utils.ApiPacketUtil;
-import cn.linkfast.vo.OpenProxyOrderVO;
+import cn.linkfast.vo.ProxyOrderCreateVO;
 import cn.linkfast.vo.ProxyOrderVO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,11 +32,13 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
 
 @Slf4j
 @Service
@@ -45,23 +49,18 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     private final ObjectMapper objectMapper;
     private final ApiPacketUtil apiPacketUtil;
     private final ProxyProductDAO proxyProductDAO;
-
     @Value("${api.ipv.env}")
     private String env;
-
     @Value("${api.ipv.sandbox_url}")
     private String sandboxUrl;
-
     @Value("${api.ipv.prod_url}")
     private String prodUrl;
-
     @Value("${api.ipv.path.order_info}")
     private String orderQueryPath;
-
     @Value("${api.ipv.path.order_create}")
     private String orderOpenPath;
-
     private String baseUrl; // 动态确定的基础地址
+
 
     private static @NonNull ProxyOrderSearchCondition buildSearchCondition(@NonNull ProxyOrderQueryDTO queryDto) {
         ProxyOrderSearchCondition condition = new ProxyOrderSearchCondition();
@@ -91,6 +90,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public OrderUpdateResultDTO syncOrderDetails(Map<String, Object> params) throws Exception {
 
 
@@ -105,6 +105,26 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
 
         ProxyOrder order = processResponse(responseStr);
         if (order == null) return new OrderUpdateResultDTO();
+
+        // 将订单的 appOrderNo 赋值给每个实例，确保实例表也关联渠道商订单号
+        if (order.getInstances() != null && order.getAppOrderNo() != null) {
+            for (ProxyInstance instance : order.getInstances()) {
+                if (instance.getAppOrderNo() == null) {
+                    instance.setAppOrderNo(order.getAppOrderNo());
+                }
+            }
+        }
+
+        // 通过 appOrderNo 查询本地订单，获取 userId 赋值给每个实例
+        if (order.getInstances() != null && !order.getInstances().isEmpty()) {
+            ProxyOrder localOrder = proxyOrderDAO.findProxyOrder(order.getAppOrderNo());
+            if (localOrder != null && localOrder.getUserId() != null) {
+                for (ProxyInstance instance : order.getInstances()) {
+                    instance.setUserId(localOrder.getUserId());
+                }
+            }
+        }
+
         return proxyOrderDAO.updateProxyOrder(order);
     }
 
@@ -162,16 +182,22 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     }
 
     @Override
-    public OpenProxyOrderVO createProxyOrder(ProxyOrderCreateDTO dto) {
-        String appOrderNo = dto.getUserId() + System.currentTimeMillis();
+    @Transactional(rollbackFor = Exception.class)
+    public ProxyOrderCreateVO createProxyOrder(ProxyOrderCreateDTO dto) {
+        Long userId = 2032958739262217115L;
+        String appOrderNo = userId + "" + System.currentTimeMillis();
         ProxyOrder order = new ProxyOrder();
         order.setAppOrderNo(appOrderNo);
-        order.setUserId(Long.valueOf(dto.getUserId()));
+        /*
+          userId 目前没有传入参数，暂时写死一个值，后续可以通过鉴权上下文获取当前用户ID，或者在DTO中添加userId字段由调用方传入
+         */
+        order.setUserId(userId);
         order.setOrderType(dto.getOrderType());
         order.setTotalQuantity(dto.getTotalQuantity());
         order.setStatus(1); // 待处理
         List<ProxyOrderItem> items = dto.getParams().stream().map(itemDto -> {
             ProxyOrderItem item = new ProxyOrderItem();
+            item.setAppOrderNo(appOrderNo);
             item.setProductNo(itemDto.getProductNo());
             item.setProxyType(itemDto.getProxyType());
             item.setCountryCode(itemDto.getCountryCode());
@@ -237,16 +263,38 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             if (respOrder != null) {
                 orderNo = respOrder.getOrderNo();
                 amount = respOrder.getAmount();
-                proxyOrderDAO.updateProxyOrder(appOrderNo, orderNo, amount);
+                OrderUpdateResultDTO updateResult = proxyOrderDAO.updateProxyOrder(appOrderNo, orderNo, amount);
+                // 校验主订单更新行数，预期更新 1 条
+                if (updateResult.getProxyOrderUpdatedRows() != 1) {
+                    throw new BusinessException("回写订单失败，主订单预期更新1条，实际更新" + updateResult.getProxyOrderUpdatedRows() + "条，appOrderNo=" + appOrderNo);
+                }
+                // 校验子订单更新行数
+                int expectSubCount = order.getItems().size();
+                int actualSubCount = updateResult.getProxyOrderItemUpdatedRows();
+                if (actualSubCount != expectSubCount) {
+                    throw new BusinessException("子订单更新异常！预期更新" + expectSubCount + "条，实际更新" + actualSubCount + "条，触发事务回滚");
+                }
             }
         } catch (Exception e) {
-            log.error("第三方开通代理下单失败", e);
+            throw new BusinessException("订单创建失败，请稍后重试", e);
         }
-        OpenProxyOrderVO vo = new OpenProxyOrderVO();
+        ProxyOrderCreateVO vo = new ProxyOrderCreateVO();
         vo.setAppOrderNo(appOrderNo);
         vo.setStatus(1); // 待处理
         vo.setOrderNo(orderNo);
         vo.setAmount(amount);
         return vo;
     }
+
+    @Override
+    public ProxyOrderVO getProxyOrder(String appOrderNo) {
+        ProxyOrder order = proxyOrderDAO.findProxyOrder(appOrderNo);
+        if (order == null) {
+            return null;
+        }
+        return convertToVO(order);
+    }
+
 }
+
+

@@ -99,7 +99,7 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
     public int batchSaveOrUpdate(List<ProxyProduct> products) {
         log.info("批量保存或更新代理产品数据，数量：{}", products.size());
         // 修正点 1：空集合返回 0，确保符合 int 返回类型
-        if (products == null || products.isEmpty()) {
+        if (products.isEmpty()) {
             return 0;
         }
 
@@ -190,35 +190,44 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
 
     @Override
     public List<ProxyProduct> findProxyProductList(ProxyProductSearchCondition condition) {
-        // 1. 构造基础 SQL
-        // 使用 WHERE 1=1 是为了方便后续动态拼接 AND 条件
-        StringBuilder sql = new StringBuilder("SELECT * FROM proxy_product WHERE country_code = ? AND city_code = ?");
+        StringBuilder sql = new StringBuilder("SELECT * FROM proxy_product WHERE country_code = ? AND city_code = ? ");
         List<Object> params = new ArrayList<>();
-
-        // 2. 添加必传参数
         params.add(condition.getCountryCode());
         params.add(condition.getCityCode());
 
-        // 3. 动态拼接分页逻辑
-        // 只有当 limit 和 offset 都不为 null 时，才执行数据库分页
-        // 如果前端没传 pageSize/page，这里就不会拼 LIMIT，从而实现“查询全部数据”
-        if (condition.getLimit() != null && condition.getOffset() != null) {
-            sql.append(" LIMIT ? OFFSET ?");
-            params.add(condition.getLimit());
-            params.add(condition.getOffset());
-        }
+        // 动态拼接 proxyType 条件：为null或空集合时不限制
+        appendProxyTypeCondition(sql, params, condition);
 
-        // 4. 执行查询并返回结果
-        // BeanPropertyRowMapper 会自动处理数据库下划线字段到 Java 驼峰命名的映射
+        sql.append("LIMIT ? OFFSET ?");
+        params.add(condition.getLimit());
+        params.add(condition.getOffset());
+
         return jdbcTemplate.query(sql.toString(), proxyProductRowMapper, params.toArray());
     }
 
     @Override
     public int countProxyProduct(ProxyProductSearchCondition condition) {
-        String sql = "SELECT COUNT(*) FROM proxy_product WHERE country_code = ? AND city_code = ?";
-        // 注意：Count 语句不需要拼 LIMIT 和 OFFSET
-        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, condition.getCountryCode(), condition.getCityCode());
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM proxy_product WHERE country_code = ? AND city_code = ? ");
+        List<Object> params = new ArrayList<>();
+        params.add(condition.getCountryCode());
+        params.add(condition.getCityCode());
+
+        // 动态拼接 proxyType 条件
+        appendProxyTypeCondition(sql, params, condition);
+
+        Integer count = jdbcTemplate.queryForObject(sql.toString(), Integer.class, params.toArray());
         return count != null ? count : 0;
+    }
+
+    /**
+     * 拼接 proxyType IN 条件（列表查询和统计查询共用）
+     */
+    private void appendProxyTypeCondition(StringBuilder sql, List<Object> params, ProxyProductSearchCondition condition) {
+        if (condition.getProxyType() != null && !condition.getProxyType().isEmpty()) {
+            String placeholders = condition.getProxyType().stream().map(t -> "?").collect(java.util.stream.Collectors.joining(","));
+            sql.append("AND proxy_type IN (").append(placeholders).append(") ");
+            params.addAll(condition.getProxyType());
+        }
     }
 
     // --- JSON 工具方法 ---

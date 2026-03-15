@@ -4,33 +4,29 @@ import lombok.Data;
 
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.io.Serial;
 import java.io.Serializable;
-import java.util.List;
 
 /**
- * 代理产品查询参数传输对象 (Data Transfer Object)
- * 接收前端传来的所有筛选和分页参数
+ * 代理实例查询入参DTO
  */
 @Data
-public class ProxyProductQueryDTO implements Serializable {
-
+public class ProxyInstanceQueryDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
     /**
-     * 国家代码（必传）
+     * 代理类型（必传）
      */
-    @NotBlank(message = "国家代码countryCode不能为空")
-    private String countryCode;
+    @NotNull(message = "代理类型proxyType不能为空")
+    private Integer proxyType;
 
     /**
-     * 城市代码（必传）
+     * 实例状态（必传）
      */
-    @NotBlank(message = "城市代码cityCode不能为空")
-    private String cityCode;
+    @NotNull(message = "实例状态status不能为空")
+    private Integer status;
 
     /**
      * 页码（必传，大于0）
@@ -48,7 +44,23 @@ public class ProxyProductQueryDTO implements Serializable {
     private Integer pageSize;
 
     /**
-     * 代理类型列表（可选，为null或空集合时查询全部类型）
+     * 国家代码（可选）
      */
-    private List<Integer> proxyType;
+    private String countryCode;
+
+    /**
+     * 城市代码（可选）
+     */
+    private String cityCode;
+
+    /**
+     * 是否自动续费（可选）
+     */
+    private Integer renew;
+
+    /**
+     * IP地址（可选，模糊查询）
+     */
+    private String ip;
 }
+

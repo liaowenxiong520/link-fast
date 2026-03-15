@@ -1,0 +1,190 @@
+package cn.linkfast.service.impl;
+
+import cn.linkfast.common.PageResult;
+import cn.linkfast.dao.ProxyInstanceDAO;
+import cn.linkfast.dto.ProxyInstanceQueryDTO;
+import cn.linkfast.dto.ProxyInstanceSearchCondition;
+import cn.linkfast.entity.ProxyInstance;
+import cn.linkfast.service.ProxyInstanceService;
+import cn.linkfast.utils.ApiPacketUtil;
+import cn.linkfast.vo.ProxyInstanceVO;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 代理实例服务实现类
+ *
+ * @author liaowenxiong
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ProxyInstanceServiceImpl implements ProxyInstanceService {
+
+    private final ObjectMapper objectMapper;
+    private final ProxyInstanceDAO proxyInstanceDAO;
+    private final ApiPacketUtil apiPacketUtil;
+
+    @Value("${api.ipv.env}")
+    private String env;
+
+    @Value("${api.ipv.sandbox_url}")
+    private String sandboxUrl;
+
+    @Value("${api.ipv.prod_url}")
+    private String prodUrl;
+
+    @Value("${api.ipv.path.instance_query}")
+    private String instanceQueryPath;
+
+    private String baseUrl;
+
+    /**
+     * 初始化：根据环境开关选择 BaseUrl
+     */
+    @PostConstruct
+    public void init() {
+        if ("prod".equalsIgnoreCase(env)) {
+            this.baseUrl = prodUrl;
+        } else {
+            this.baseUrl = sandboxUrl;
+        }
+    }
+
+    @Override
+    public int syncProxyInstance(String instanceNo) throws Exception {
+        // 1. 构造请求参数
+        Map<String, Object> params = new HashMap<>();
+        params.put("instances", Collections.singletonList(instanceNo));
+
+        // 2. 拼接完整的请求 URL
+        String fullUrl = baseUrl + instanceQueryPath;
+
+        // 3. 业务参数加密封装
+        Map<String, Object> finalRequest = apiPacketUtil.pack(params);
+
+        // 4. 发送 HTTP 请求
+        String responseStr = sendPost(fullUrl, finalRequest);
+
+        // 5. 解析响应并持久化
+        return processResponse(responseStr);
+    }
+
+    @Override
+    public PageResult<ProxyInstanceVO> getProxyInstances(ProxyInstanceQueryDTO queryDto) {
+        // 1. DTO 转 SearchCondition（计算 offset）
+        ProxyInstanceSearchCondition condition = buildSearchCondition(queryDto);
+
+        // 2. 查询总条数
+        int total = proxyInstanceDAO.countProxyInstance(condition);
+        if (total == 0) {
+            return new PageResult<>(0, List.of(), queryDto.getPageNum(), queryDto.getPageSize());
+        }
+
+        // 3. 执行数据查询
+        List<ProxyInstance> entityList = proxyInstanceDAO.findProxyInstances(condition);
+
+        // 4. Entity 转 VO
+        List<ProxyInstanceVO> voList = entityList.stream().map(this::convertToVO).collect(Collectors.toList());
+
+        // 5. 封装返回
+        return new PageResult<>(total, voList, queryDto.getPageNum(), queryDto.getPageSize());
+    }
+
+    private static ProxyInstanceSearchCondition buildSearchCondition(ProxyInstanceQueryDTO queryDto) {
+        ProxyInstanceSearchCondition condition = new ProxyInstanceSearchCondition();
+        condition.setProxyType(queryDto.getProxyType());
+        condition.setStatus(queryDto.getStatus());
+        condition.setCountryCode(queryDto.getCountryCode());
+        condition.setCityCode(queryDto.getCityCode());
+        condition.setRenew(queryDto.getRenew());
+        condition.setIp(queryDto.getIp());
+
+        if (queryDto.getPageNum() != null && queryDto.getPageSize() != null) {
+            condition.setLimit(queryDto.getPageSize());
+            int offset = (queryDto.getPageNum() - 1) * queryDto.getPageSize();
+            condition.setOffset(Math.max(offset, 0));
+        }
+        return condition;
+    }
+
+    private ProxyInstanceVO convertToVO(ProxyInstance entity) {
+        ProxyInstanceVO vo = new ProxyInstanceVO();
+        BeanUtils.copyProperties(entity, vo);
+        return vo;
+    }
+
+    /**
+     * 解析第三方API响应数据，解密后保存到数据库
+     */
+    private int processResponse(String responseStr) throws Exception {
+        JsonNode root = objectMapper.readTree(responseStr);
+        if (root.path("code").asInt() == 200) {
+            String encryptedData = root.path("data").asText();
+            if (encryptedData == null || encryptedData.isEmpty()) {
+                log.warn("实例接口返回 data 为空");
+                return 0;
+            }
+
+            // 解密响应数据
+            String decryptedJson = apiPacketUtil.unpack(encryptedData);
+            log.info("实例接口返回数据解密成功: {}", decryptedJson);
+
+            // 将解密后的 JSON 转换为 ProxyInstance 列表
+            List<ProxyInstance> instanceList = objectMapper.readValue(
+                    decryptedJson, new TypeReference<List<ProxyInstance>>() {
+                    });
+
+            if (instanceList == null || instanceList.isEmpty()) {
+                log.warn("实例接口返回实例列表为空");
+                return 0;
+            }
+
+            // 保存或更新到数据库
+            return proxyInstanceDAO.batchSaveOrUpdate(instanceList);
+        } else {
+            throw new RuntimeException("实例API错误: " + root.path("msg").asText());
+        }
+    }
+
+    /**
+     * 发送 POST 请求
+     */
+    private String sendPost(String url, Map<String, Object> body) throws Exception {
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpPost post = new HttpPost(url);
+            String json = objectMapper.writeValueAsString(body);
+            post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
+            return client.execute(post, response -> {
+                int status = response.getCode();
+                if (status >= 200 && status < 300) {
+                    return EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                } else {
+                    log.error("HTTP 请求失败，状态码: {}", status);
+                    return "{\"code\":" + status + ", \"msg\":\"HTTP Error\"}";
+                }
+            });
+        }
+    }
+}
+

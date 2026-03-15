@@ -31,9 +31,9 @@ public interface ProxyOrderDAO {
     int countProxyOrder(ProxyOrderSearchCondition condition);
 
     /**
-     * 回写第三方返回的 orderNo 和 amount
+     * 回写第三方返回的 orderNo 和 amount（同时更新 proxy_order 和 proxy_order_item）
      */
-    int updateProxyOrder(String appOrderNo, String orderNo, java.math.BigDecimal amount);
+    OrderUpdateResultDTO updateProxyOrder(String appOrderNo, String orderNo, java.math.BigDecimal amount);
 
     /**
      * 保存订单主数据和项目数据到数据库
@@ -43,4 +43,12 @@ public interface ProxyOrderDAO {
      * @return 保存的订单的 appOrderNo
      */
     String saveProxyOrder(ProxyOrder order);
+
+    /**
+     * 根据渠道商订单号查询单个订单
+     *
+     * @param appOrderNo 渠道商订单号
+     * @return 订单实体，不存在则返回 null
+     */
+    ProxyOrder findProxyOrder(String appOrderNo);
 }

@@ -3,8 +3,8 @@ package cn.linkfast.dao.impl;
 import cn.linkfast.dao.ProxyOrderDAO;
 import cn.linkfast.dto.OrderUpdateResultDTO;
 import cn.linkfast.dto.ProxyOrderSearchCondition;
+import cn.linkfast.entity.ProxyInstance;
 import cn.linkfast.entity.ProxyOrder;
-import cn.linkfast.entity.ProxyOrderInstance;
 import cn.linkfast.entity.ProxyOrderItem;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,8 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,35 +28,33 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
     private final ObjectMapper objectMapper;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public OrderUpdateResultDTO updateProxyOrder(ProxyOrder order) {
-        // 改为插入或更新（主键冲突时更新指定字段）
-        String orderSql = "INSERT INTO proxy_order (order_no, app_order_no, user_id, order_type, status, total_quantity, amount, has_refund, instance_total) " + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) " + "ON DUPLICATE KEY UPDATE status=VALUES(status), amount=VALUES(amount), has_refund=VALUES(has_refund), instance_total=VALUES(instance_total), order_type=VALUES(order_type), order_no=VALUES(order_no)";
+        // 仅更新订单主表（proxy_order 在此场景下不存在插入的情况）
+        String orderSql = "UPDATE proxy_order SET order_no=?, order_type=?, status=?, total_quantity=?, amount=?, has_refund=?, instance_total=? WHERE app_order_no=?";
         List<Object> params = new ArrayList<>();
         params.add(order.getOrderNo());
-        params.add(order.getAppOrderNo());
-        params.add(order.getUserId());
         params.add(order.getOrderType());
         params.add(order.getStatus());
         params.add(order.getTotalQuantity());
         params.add(order.getAmount());
         params.add(order.getHasRefund());
         params.add(order.getInstanceTotal());
+        params.add(order.getAppOrderNo());
 
-        // 1. 插入或更新主表数据
+        // 1. 更新主表数据
         int proxyOrderUpdatedRows = jdbcTemplate.update(orderSql, params.toArray());
-        log.info(">>> 订单已插入或更新，单号: {}，影响行数: {}", order.getOrderNo(), proxyOrderUpdatedRows);
+        log.info(">>> 订单已更新，单号: {}，影响行数: {}", order.getOrderNo(), proxyOrderUpdatedRows);
 
         // 2. 从 order 对象中获取实例列表进行批量处理
-        List<ProxyOrderInstance> instances = order.getInstances();
+        List<ProxyInstance> instances = order.getInstances();
         if (instances == null || instances.isEmpty()) {
             log.warn(">>> 订单 {} 不包含任何实例数据，跳过子表更新", order.getOrderNo());
-            return new OrderUpdateResultDTO(proxyOrderUpdatedRows, 0);
+            return new OrderUpdateResultDTO(proxyOrderUpdatedRows, 0,0);
         }
 
-        String instSql = "INSERT INTO proxy_order_instance (order_no, instance_no, proxy_type, protocol, ip, port, region_id, country_code, city_code, " + "use_type, username, pwd, user_expired, flow_total, flow_balance, status, renew, bridges, open_at, renew_at, release_at, " + "product_no, extend_ip, project_id) " + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " + "ON DUPLICATE KEY UPDATE status=VALUES(status), flow_balance=VALUES(flow_balance), renew_at=VALUES(renew_at), release_at=VALUES(release_at)";
+        String instSql = "INSERT INTO proxy_instance (order_no, app_order_no, user_id, instance_no, proxy_type, protocol, ip, port, region_id, country_code, city_code, " + "use_type, username, pwd, user_expired, flow_total, flow_balance, status, renew, bridges, open_at, renew_at, release_at, " + "product_no, extend_ip, project_id) " + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " + "ON DUPLICATE KEY UPDATE status=VALUES(status), flow_balance=VALUES(flow_balance), renew_at=VALUES(renew_at), release_at=VALUES(release_at), app_order_no=VALUES(app_order_no), user_id=VALUES(user_id)";
 
-        List<Object[]> batchArgs = instances.stream().map(i -> new Object[]{i.getOrderNo(), i.getInstanceNo(), i.getProxyType(), i.getProtocol(), i.getIp(), i.getPort(), i.getRegionId(), i.getCountryCode(), i.getCityCode(), i.getUseType(), i.getUsername(), i.getPwd(), i.getUserExpired(), i.getFlowTotal(), i.getFlowBalance(), i.getStatus(), i.getRenew(), toJson(i.getBridges()), i.getOpenAt(), i.getRenewAt(), i.getReleaseAt(), i.getProductNo(), i.getExtendIp(), i.getProjectId()}).collect(Collectors.toList());
+        List<Object[]> batchArgs = instances.stream().map(i -> new Object[]{i.getOrderNo(), i.getAppOrderNo(), i.getUserId(), i.getInstanceNo(), i.getProxyType(), i.getProtocol(), i.getIp(), i.getPort(), i.getRegionId(), i.getCountryCode(), i.getCityCode(), i.getUseType(), i.getUsername(), i.getPwd(), i.getUserExpired(), i.getFlowTotal(), i.getFlowBalance(), i.getStatus(), i.getRenew(), toJson(i.getBridges()), i.getOpenAt(), i.getRenewAt(), i.getReleaseAt(), i.getProductNo(), i.getExtendIp(), i.getProjectId()}).collect(Collectors.toList());
 
         int[] results = jdbcTemplate.batchUpdate(instSql, batchArgs);
         log.info(">>> 订单 {} 的实例已成功持久化，数量: {}", order.getOrderNo(), instances.size());
@@ -71,7 +69,7 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
             }
         }
         log.info(">>> 订单及 {} 个实例已成功持久化，单号: {}", instances.size(), order.getOrderNo());
-        return new OrderUpdateResultDTO(proxyOrderUpdatedRows, proxyInstanceUpdatedRows);
+        return new OrderUpdateResultDTO(proxyOrderUpdatedRows, proxyInstanceUpdatedRows,0);
     }
 
 
@@ -162,11 +160,21 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
     }
 
     /**
-     * 回写第三方返回的 orderNo 和 amount
+     * 回写第三方返回的 orderNo 和 amount（同时更新 proxy_order 和 proxy_order_item）
      */
-    public int updateProxyOrder(String appOrderNo, String orderNo, java.math.BigDecimal amount) {
-        String sql = "UPDATE proxy_order SET order_no=?, amount=? WHERE app_order_no=?";
-        return jdbcTemplate.update(sql, orderNo, amount, appOrderNo);
+    @Override
+    public OrderUpdateResultDTO updateProxyOrder(String appOrderNo, String orderNo, BigDecimal amount) {
+        // 1. 更新主订单表
+        String orderSql = "UPDATE proxy_order SET order_no=?, amount=? WHERE app_order_no=?";
+        int proxyOrderUpdatedRows = jdbcTemplate.update(orderSql, orderNo, amount, appOrderNo);
+        log.info(">>> 回写订单主表，appOrderNo: {}，orderNo: {}，影响行数: {}", appOrderNo, orderNo, proxyOrderUpdatedRows);
+
+        // 2. 更新订单明细表
+        String itemSql = "UPDATE proxy_order_item SET order_no=? WHERE app_order_no=?";
+        int proxyOrderItemUpdatedRows = jdbcTemplate.update(itemSql, orderNo, appOrderNo);
+        log.info(">>> 回写订单明细表，appOrderNo: {}，orderNo: {}，影响行数: {}", appOrderNo, orderNo, proxyOrderItemUpdatedRows);
+
+        return new OrderUpdateResultDTO(proxyOrderUpdatedRows, 0, proxyOrderItemUpdatedRows);
     }
 
     /**
@@ -176,7 +184,6 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
      * @param order 包含主表信息和 items 列表的订单对象
      * @return 保存的订单的 appOrderNo（便于后续业务使用）
      */
-    @Transactional(rollbackFor = Exception.class)
     public String saveProxyOrder(ProxyOrder order) {
 
         // 1. 插入主表数据（纯插入，不做更新）
@@ -208,6 +215,19 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
 
         log.info(">>> 订单保存完成，appOrderNo: {}", order.getAppOrderNo());
         return order.getAppOrderNo();
+    }
+
+    /**
+     * 根据渠道商订单号查询单个订单
+     *
+     * @param appOrderNo 渠道商订单号
+     * @return 订单实体，不存在则返回 null
+     */
+    @Override
+    public ProxyOrder findProxyOrder(String appOrderNo) {
+        String sql = "SELECT * FROM proxy_order WHERE app_order_no = ?";
+        List<ProxyOrder> results = jdbcTemplate.query(sql, new BeanPropertyRowMapper<>(ProxyOrder.class), appOrderNo);
+        return results.isEmpty() ? null : results.get(0);
     }
 
 }

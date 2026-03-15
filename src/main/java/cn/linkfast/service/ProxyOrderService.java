@@ -4,7 +4,7 @@ import cn.linkfast.common.PageResult;
 import cn.linkfast.dto.ProxyOrderCreateDTO;
 import cn.linkfast.dto.OrderUpdateResultDTO;
 import cn.linkfast.dto.ProxyOrderQueryDTO;
-import cn.linkfast.vo.OpenProxyOrderVO;
+import cn.linkfast.vo.ProxyOrderCreateVO;
 import cn.linkfast.vo.ProxyOrderVO;
 
 import java.util.Map;
@@ -26,5 +26,13 @@ public interface ProxyOrderService {
     /**
      * 开通代理（创建订单）
      */
-    OpenProxyOrderVO createProxyOrder(ProxyOrderCreateDTO dto);
+    ProxyOrderCreateVO createProxyOrder(ProxyOrderCreateDTO dto);
+
+    /**
+     * 根据渠道商订单号查询单个订单
+     *
+     * @param appOrderNo 渠道商订单号
+     * @return 订单VO
+     */
+    ProxyOrderVO getProxyOrder(String appOrderNo);
 }

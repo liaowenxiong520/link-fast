@@ -15,6 +15,7 @@ import java.util.List;
  */
 @Data
 public class ProxyOrder {
+    private Long id;
     private String orderNo;       // 平台订单编号
     private String appOrderNo;    // 渠道商订单号
     private Long userId;
@@ -32,7 +33,7 @@ public class ProxyOrder {
     private Date updateTime;
 
     // 封装订单下的所有实例明细
-    private List<ProxyOrderInstance> instances;
+    private List<ProxyInstance> instances;
     // 封装订单下的所有商品明细
     private List<ProxyOrderItem> items;
 }

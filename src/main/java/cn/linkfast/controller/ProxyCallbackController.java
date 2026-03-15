@@ -2,6 +2,7 @@ package cn.linkfast.controller;
 
 import cn.linkfast.common.Result;
 import cn.linkfast.dto.OrderUpdateResultDTO;
+import cn.linkfast.service.ProxyInstanceService;
 import cn.linkfast.service.ProxyOrderService;
 import cn.linkfast.service.ProxyProductService;
 import lombok.RequiredArgsConstructor;
@@ -26,17 +27,19 @@ public class ProxyCallbackController {
 
     private final ProxyProductService proxyProductService;
     private final ProxyOrderService proxyOrderService;
+    private final ProxyInstanceService proxyInstanceService;
 
     /**
      * 第三方通知回调地址
      *
-     * @param type 变更类型 (例如: "product")
-     * @param no   变更编号 (产品编号 productNo)
-     * @param op   操作类型 (例如: "update", "add")
+     * @param type 变更类型 (例如: "product", "order", "instance")
+     * @param no   变更编号 (产品编号/订单编号/实例编号)
+     * @param op   操作类型 (例如: "update", "add")，实例回调不携带此参数
      * @return 成功响应给第三方
      */
     @PostMapping("/notify")
-    public Result<Void> handleNotify(@RequestParam("type") String type, @RequestParam("no") String no, @RequestParam("op") String op) {
+    public Result<Void> handleNotify(@RequestParam("type") String type, @RequestParam("no") String no,
+                                     @RequestParam(value = "op", required = false) String op) {
 
         log.info(">>> 收到第三方回调通知：type={}, no={}, op={}", type, no, op);
 
@@ -70,6 +73,15 @@ public class ProxyCallbackController {
                 throw new RuntimeException(e);
             }
 
+        } else if ("instance".equalsIgnoreCase(type)) {
+            // 实例信息变动回调处理
+            try {
+                int updatedRows = proxyInstanceService.syncProxyInstance(no);
+                log.info("<<< 实例 {} 同步成功，更新 {} 行", no, updatedRows);
+            } catch (Exception e) {
+                log.error("<<< 实例 {} 同步失败：{}", no, e.getMessage());
+                return Result.error("实例 " + no + " 同步失败：" + e.getMessage());
+            }
         }
 
         // 返回给第三方，告知已收到通知

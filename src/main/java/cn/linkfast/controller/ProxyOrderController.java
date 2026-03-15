@@ -5,7 +5,7 @@ import cn.linkfast.common.PageResult;
 import cn.linkfast.dto.ProxyOrderCreateDTO;
 import cn.linkfast.dto.ProxyOrderQueryDTO;
 import cn.linkfast.service.ProxyOrderService;
-import cn.linkfast.vo.OpenProxyOrderVO;
+import cn.linkfast.vo.ProxyOrderCreateVO;
 import cn.linkfast.vo.ProxyOrderVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -35,7 +35,7 @@ public class ProxyOrderController {
      * 开通代理（创建订单）
      */
     @PostMapping("/open")
-    public OpenProxyOrderVO createProxyOrder(@RequestBody @Validated ProxyOrderCreateDTO dto) {
+    public ProxyOrderCreateVO createProxyOrder(@RequestBody @Validated ProxyOrderCreateDTO dto) {
         return proxyOrderService.createProxyOrder(dto);
     }
 }

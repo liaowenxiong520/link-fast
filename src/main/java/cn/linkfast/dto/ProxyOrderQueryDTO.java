@@ -18,6 +18,13 @@ public class ProxyOrderQueryDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+
+    /**
+     * 订单状态（必传）
+     */
+    @NotNull(message = "订单状态status不能为空")
+    private Integer status;
+
     /**
      * 页码（必传）
      */
@@ -30,11 +37,6 @@ public class ProxyOrderQueryDTO implements Serializable {
     @NotNull(message = "每页条数pageSize不能为空")
     private Integer pageSize;
 
-    /**
-     * 订单状态（必传）
-     */
-    @NotNull(message = "订单状态status不能为空")
-    private Integer status;
 
     /**
      * 订单类型（非必传）

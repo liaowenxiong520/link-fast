@@ -2,17 +2,16 @@ package cn.linkfast.dto;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
- * @author liaowenxiong
- * @version 1.0
- * @description TODO
- * @since 2026/3/6 14:17
+ * 代理产品查询条件（DAO层SQL拼接使用）
  */
 @Data
 public class ProxyProductSearchCondition {
-    private String countryCode;   // 必传
-    private String cityCode;      // 必传
-    // 以下为分页参数，如果不传则为 null
-    private Integer limit;        // 对应 pageSize
-    private Integer offset;       // 对应 (page-1) * pageSize
+    private String countryCode;        // 必传
+    private String cityCode;           // 必传
+    private List<Integer> proxyType;   // 可选，为null或空则不限制
+    private Integer limit;             // 对应 pageSize
+    private Integer offset;            // 对应 (pageNum-1) * pageSize
 }
