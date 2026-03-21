@@ -18,6 +18,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author liaowenxiong
@@ -51,6 +52,7 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
         p.setCityCode(rs.getString("city_code"));
         p.setDetail(rs.getString("detail"));
         p.setCostPrice(rs.getBigDecimal("cost_price"));
+        p.setRetailPrice(rs.getBigDecimal("retail_price"));
         p.setInventory(rs.getInt("inventory"));
         p.setIpType(rs.getInt("ip_type"));
         p.setIspType(rs.getInt("isp_type"));
@@ -189,14 +191,21 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
     }
 
     @Override
-    public List<ProxyProduct> findProxyProductList(ProxyProductSearchCondition condition) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM proxy_product WHERE country_code = ? AND city_code = ? ");
+    public int countProxyProduct(ProxyProductSearchCondition condition) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM proxy_product");
         List<Object> params = new ArrayList<>();
-        params.add(condition.getCountryCode());
-        params.add(condition.getCityCode());
+        buildQueryCondition(params, condition, sql);
 
-        // 动态拼接 proxyType 条件：为null或空集合时不限制
-        appendProxyTypeCondition(sql, params, condition);
+        Integer count = jdbcTemplate.queryForObject(sql.toString(), Integer.class, params.toArray());
+        return count != null ? count : 0;
+    }
+
+    @Override
+    public List<ProxyProduct> findProxyProductList(ProxyProductSearchCondition condition) {
+        List<Object> params = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("SELECT * FROM proxy_product ");
+        //拼接查询条件
+        buildQueryCondition(params, condition, sql);
 
         sql.append("LIMIT ? OFFSET ?");
         params.add(condition.getLimit());
@@ -205,30 +214,26 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
         return jdbcTemplate.query(sql.toString(), proxyProductRowMapper, params.toArray());
     }
 
-    @Override
-    public int countProxyProduct(ProxyProductSearchCondition condition) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM proxy_product WHERE country_code = ? AND city_code = ? ");
-        List<Object> params = new ArrayList<>();
-        params.add(condition.getCountryCode());
-        params.add(condition.getCityCode());
+    private void buildQueryCondition(List<Object> params, ProxyProductSearchCondition condition, StringBuilder sql) {
 
-        // 动态拼接 proxyType 条件
-        appendProxyTypeCondition(sql, params, condition);
 
-        Integer count = jdbcTemplate.queryForObject(sql.toString(), Integer.class, params.toArray());
-        return count != null ? count : 0;
-    }
+        if (condition.getCountryCode() != null && !condition.getCountryCode().isEmpty()) {
+            sql.append(" WHERE country_code = ? ");
+            params.add(condition.getCountryCode());
+        }
 
-    /**
-     * 拼接 proxyType IN 条件（列表查询和统计查询共用）
-     */
-    private void appendProxyTypeCondition(StringBuilder sql, List<Object> params, ProxyProductSearchCondition condition) {
+        if (condition.getCityCode() != null && !condition.getCityCode().isEmpty()) {
+            sql.append(" AND city_code = ? ");
+            params.add(condition.getCityCode());
+        }
+
         if (condition.getProxyType() != null && !condition.getProxyType().isEmpty()) {
-            String placeholders = condition.getProxyType().stream().map(t -> "?").collect(java.util.stream.Collectors.joining(","));
+            String placeholders = condition.getProxyType().stream().map(t -> "?").collect(Collectors.joining(","));
             sql.append("AND proxy_type IN (").append(placeholders).append(") ");
             params.addAll(condition.getProxyType());
         }
     }
+
 
     // --- JSON 工具方法 ---
 

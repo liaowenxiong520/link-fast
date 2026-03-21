@@ -1,11 +1,10 @@
 package cn.linkfast.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import javax.validation.constraints.Max;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
@@ -21,15 +20,13 @@ public class ProxyProductQueryDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 国家代码（必传）
+     * 国家代码（可选）
      */
-    @NotBlank(message = "国家代码countryCode不能为空")
     private String countryCode;
 
     /**
-     * 城市代码（必传）
+     * 城市代码（可选）
      */
-    @NotBlank(message = "城市代码cityCode不能为空")
     private String cityCode;
 
     /**

@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,8 +30,8 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
     private final ObjectMapper objectMapper;
 
     @Override
-    public int batchSaveOrUpdate(List<ProxyInstance> instances) {
-        log.info("批量保存或更新代理实例数据，数量：{}", instances.size());
+    public int batchUpdate(List<ProxyInstance> instances) {
+        log.info("批量更新代理实例数据，数量：{}", instances.size());
         if (instances.isEmpty()) {
             return 0;
         }
@@ -68,26 +69,31 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
                 i.getProjectId(),
                 i.getInstanceNo()
         }).collect(Collectors.toList());
+        int[] results;
+        try {
+            results = jdbcTemplate.batchUpdate(sql, batchArgs);
+        } catch (Exception e) {
+            log.error("批量更新代理实例失败，待处理数量：{}", instances.size(), e);
+            throw new RuntimeException("批量更新代理实例异常", e);
+        }
 
-        int[] results = jdbcTemplate.batchUpdate(sql, batchArgs);
-
-        int successCount = 0;
+        int actualChangeCount = 0;
         for (int r : results) {
-            if (r >= 0) {
-                successCount++;
+            if (r > 0) {
+                actualChangeCount++;
             }
         }
-        log.info("批量保存或更新代理实例数据，成功数量：{}", successCount);
-        return successCount;
+        log.info("批量更新代理实例数据，成功数量：{}", actualChangeCount);
+        return actualChangeCount;
     }
 
     @Override
     public List<ProxyInstance> findProxyInstances(ProxyInstanceSearchCondition condition) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM proxy_instance WHERE proxy_type = ? AND status = ? ");
+        StringBuilder sql = new StringBuilder("SELECT * FROM proxy_instance WHERE status = ? ");
         List<Object> params = new ArrayList<>();
-        params.add(condition.getProxyType());
         params.add(condition.getStatus());
 
+        appendProxyTypeCondition(sql, params, condition.getProxyType());
         appendOptionalConditions(sql, params, condition);
 
         sql.append("ORDER BY create_time DESC LIMIT ? OFFSET ?");
@@ -99,15 +105,26 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
 
     @Override
     public int countProxyInstance(ProxyInstanceSearchCondition condition) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(1) FROM proxy_instance WHERE proxy_type = ? AND status = ? ");
+        StringBuilder sql = new StringBuilder("SELECT COUNT(1) FROM proxy_instance WHERE status = ? ");
         List<Object> params = new ArrayList<>();
-        params.add(condition.getProxyType());
         params.add(condition.getStatus());
 
+        appendProxyTypeCondition(sql, params, condition.getProxyType());
         appendOptionalConditions(sql, params, condition);
 
         Integer count = jdbcTemplate.queryForObject(sql.toString(), Integer.class, params.toArray());
         return count != null ? count : 0;
+    }
+
+    /**
+     * 拼接 proxyType IN (...) 条件（为空时不限制）
+     */
+    private void appendProxyTypeCondition(StringBuilder sql, List<Object> params, Integer[] proxyType) {
+        if (proxyType != null && proxyType.length > 0) {
+            String placeholders = String.join(",", java.util.Collections.nCopies(proxyType.length, "?"));
+            sql.append("AND proxy_type IN (").append(placeholders).append(") ");
+            params.addAll(Arrays.asList(proxyType));
+        }
     }
 
     /**
@@ -121,10 +138,6 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
         if (condition.getCityCode() != null && !condition.getCityCode().isEmpty()) {
             sql.append("AND city_code = ? ");
             params.add(condition.getCityCode());
-        }
-        if (condition.getRenew() != null) {
-            sql.append("AND renew = ? ");
-            params.add(condition.getRenew());
         }
         if (condition.getIp() != null && !condition.getIp().isEmpty()) {
             sql.append("AND ip LIKE ? ");

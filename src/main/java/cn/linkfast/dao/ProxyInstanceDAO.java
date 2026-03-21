@@ -16,7 +16,7 @@ public interface ProxyInstanceDAO {
      * @param instances 实例列表
      * @return 成功处理的条数
      */
-    int batchSaveOrUpdate(List<ProxyInstance> instances);
+    int batchUpdate(List<ProxyInstance> instances);
 
     /**
      * 根据查询条件分页查询代理实例列表

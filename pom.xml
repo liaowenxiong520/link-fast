@@ -128,18 +128,25 @@
             <version>1.5.16</version>
         </dependency>
 
-        <!-- JSR 380 校验规范核心接口（@NotNull 注解的定义） -->
+        <!-- Jakarta Bean Validation 3.0 规范接口（适配 Spring 6） -->
         <dependency>
-            <groupId>javax.validation</groupId>
-            <artifactId>validation-api</artifactId>
-            <version>2.0.1.Final</version>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+            <version>3.0.2</version>
         </dependency>
 
-        <!-- Hibernate Validator（校验规范的官方实现，必须引入才能生效） -->
+        <!-- Hibernate Validator 8.x（Jakarta Bean Validation 3.0 的官方实现） -->
         <dependency>
             <groupId>org.hibernate.validator</groupId>
             <artifactId>hibernate-validator</artifactId>
-            <version>6.2.5.Final</version>
+            <version>8.0.1.Final</version>
+        </dependency>
+
+        <!-- Jakarta EL 表达式引擎（Hibernate Validator 8 必需） -->
+        <dependency>
+            <groupId>org.glassfish</groupId>
+            <artifactId>jakarta.el</artifactId>
+            <version>5.0.0-M1</version>
         </dependency>
 
         <!-- JUnit 5 测试框架 -->
@@ -173,6 +180,20 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
             <version>5.11.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- MockMvc 匹配器依赖 -->
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest</artifactId>
+            <version>2.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
+            <version>2.9.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>

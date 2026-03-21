@@ -9,8 +9,8 @@ import java.util.List;
  */
 @Data
 public class ProxyProductSearchCondition {
-    private String countryCode;        // 必传
-    private String cityCode;           // 必传
+    private String countryCode;        // 可选
+    private String cityCode;           // 可选
     private List<Integer> proxyType;   // 可选，为null或空则不限制
     private Integer limit;             // 对应 pageSize
     private Integer offset;            // 对应 (pageNum-1) * pageSize

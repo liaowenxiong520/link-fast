@@ -6,6 +6,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.DefaultServletHandlerConfigurer;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -38,7 +39,20 @@ public class WebMvcConfig implements WebMvcConfigurer {
     }
 
     /**
-     * 2. 配置默认 Servlet 处理 (对应 <mvc:default-servlet-handler/>)
+     * 2. 全局跨域配置
+     */
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+                .allowedOriginPatterns("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true)
+                .maxAge(3600);
+    }
+
+    /**
+     * 3. 配置默认 Servlet 处理 (对应 <mvc:default-servlet-handler/>)
      * 允许将对静态资源的请求转发到 Web 容器的默认 Servlet
      */
     @Override

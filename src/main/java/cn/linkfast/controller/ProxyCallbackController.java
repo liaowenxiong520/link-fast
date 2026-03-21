@@ -7,7 +7,7 @@ import cn.linkfast.service.ProxyOrderService;
 import cn.linkfast.service.ProxyProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,7 +37,7 @@ public class ProxyCallbackController {
      * @param op   操作类型 (例如: "update", "add")，实例回调不携带此参数
      * @return 成功响应给第三方
      */
-    @PostMapping("/notify")
+    @GetMapping("/notify")
     public Result<Void> handleNotify(@RequestParam("type") String type, @RequestParam("no") String no,
                                      @RequestParam(value = "op", required = false) String op) {
 
@@ -62,6 +62,7 @@ public class ProxyCallbackController {
                 return Result.error("产品 " + no + " 同步失败：" + e.getMessage());
             }
         } else if ("order".equalsIgnoreCase(type)) {
+            log.info("<<< 订单 {} 同步开始", no);
             Map<String, Object> params = new HashMap<>();
             params.put("orderNo", no);
             params.put("pageSize", 100);

@@ -2,9 +2,10 @@ package cn.linkfast.dto;
 
 import lombok.Data;
 
-import javax.validation.constraints.Max;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.io.Serial;
 import java.io.Serializable;
 
@@ -17,10 +18,10 @@ public class ProxyInstanceQueryDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 代理类型（必传）
+     * 代理类型（必传，支持多个值）
      */
-    @NotNull(message = "代理类型proxyType不能为空")
-    private Integer proxyType;
+    @NotEmpty(message = "代理类型proxyType不能为空")
+    private Integer[] proxyType;
 
     /**
      * 实例状态（必传）
@@ -52,11 +53,6 @@ public class ProxyInstanceQueryDTO implements Serializable {
      * 城市代码（可选）
      */
     private String cityCode;
-
-    /**
-     * 是否自动续费（可选）
-     */
-    private Integer renew;
 
     /**
      * IP地址（可选，模糊查询）

@@ -1,5 +1,6 @@
 package cn.linkfast.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.util.Date;
@@ -34,8 +35,11 @@ public class ProxyInstance {
 
     private List<String> bridges;       // 桥地址列表（JSON存储）
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX", timezone = "GMT+8")
     private Date openAt;          // 实例开通时间，非空
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX", timezone = "GMT+8")
     private Date renewAt;         // 最后成功续费时间，非空
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX", timezone = "GMT+8")
     private Date releaseAt;       // 实例释放成功时间，非空
     private String productNo;     // 产品编号，非空
     private String extendIp;      // 扩展地址

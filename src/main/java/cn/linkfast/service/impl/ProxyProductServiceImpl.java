@@ -3,8 +3,8 @@ package cn.linkfast.service.impl;
 import cn.linkfast.common.PageResult;
 import cn.linkfast.dao.ProxyProductDAO;
 import cn.linkfast.dto.ProxyProductQueryDTO;
-import cn.linkfast.entity.ProxyProduct;
 import cn.linkfast.dto.ProxyProductSearchCondition;
+import cn.linkfast.entity.ProxyProduct;
 import cn.linkfast.service.ProxyProductService;
 import cn.linkfast.utils.ApiPacketUtil;
 import cn.linkfast.vo.ProxyProductVO;
@@ -61,10 +61,15 @@ public class ProxyProductServiceImpl implements ProxyProductService {
 
     private static @NonNull ProxyProductSearchCondition buildSearchCondition(@NonNull ProxyProductQueryDTO queryDto) {
         ProxyProductSearchCondition condition = new ProxyProductSearchCondition();
-        condition.setCountryCode(queryDto.getCountryCode());
-        condition.setCityCode(queryDto.getCityCode());
-        condition.setProxyType(queryDto.getProxyType());
-
+        if (queryDto.getCountryCode() != null && !queryDto.getCountryCode().isEmpty()) {
+            condition.setCountryCode(queryDto.getCountryCode());
+        }
+        if (queryDto.getCityCode() != null && !queryDto.getCityCode().isEmpty()) {
+            condition.setCityCode(queryDto.getCityCode());
+        }
+        if (queryDto.getProxyType() != null && !queryDto.getProxyType().isEmpty()) {
+            condition.setProxyType(queryDto.getProxyType());
+        }
         condition.setLimit(queryDto.getPageSize());
         int offset = (queryDto.getPageNum() - 1) * queryDto.getPageSize();
         condition.setOffset(Math.max(offset, 0));
@@ -116,6 +121,7 @@ public class ProxyProductServiceImpl implements ProxyProductService {
         // 4. 将 Entity 转换为 VO (数据脱敏/格式转换)
         List<ProxyProductVO> voList = entityList.stream().map(this::convertToVO).collect(Collectors.toList());
 
+        log.info("返回给前端的产品列表：{}", voList);
         // 5. 封装返回
         return new PageResult<>(total, voList, queryDto.getPageNum(), queryDto.getPageSize());
     }

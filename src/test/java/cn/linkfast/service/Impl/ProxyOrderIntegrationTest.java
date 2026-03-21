@@ -4,6 +4,7 @@ import cn.linkfast.config.AppConfig;
 import cn.linkfast.dao.ProxyOrderDAO;
 import cn.linkfast.dao.ProxyProductDAO;
 import cn.linkfast.dto.OrderUpdateResultDTO;
+import cn.linkfast.service.PayService;
 import cn.linkfast.service.impl.ProxyOrderServiceImpl;
 import cn.linkfast.utils.ApiPacketUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,11 +43,13 @@ public class ProxyOrderIntegrationTest {
     private ProxyOrderServiceImpl proxyOrderServiceSpy;
     @Autowired
     private ProxyProductDAO proxyProductDAO;
+    @Autowired
+    private PayService payService;
 
     @BeforeEach
     void setUp() {
         // 1. 手动构造 Service 实例
-        ProxyOrderServiceImpl realService = new ProxyOrderServiceImpl(proxyOrderDAO, objectMapper, apiPacketUtil, proxyProductDAO);
+        ProxyOrderServiceImpl realService = new ProxyOrderServiceImpl(proxyOrderDAO, objectMapper, apiPacketUtil, proxyProductDAO, payService);
 
         // 2. 将实例包装为 Mockito Spy
         proxyOrderServiceSpy = spy(realService);
@@ -99,9 +102,9 @@ public class ProxyOrderIntegrationTest {
                       "status": 3,
                       "renew": 0,
                       "bridges": ["10.0.0.1:8080", "10.0.0.2:8080"],
-                      "openAt": "2026-03-12 09:30:00",
-                      "renewAt": "2026-03-12 09:30:00",
-                      "releaseAt":"2026-03-12 09:35:00",
+                       "openAt": "2026-03-20T05:45:37+08:00",
+                      "renewAt": "2026-03-20T05:45:37+08:00",
+                      "releaseAt":"2026-03-20T05:45:37+08:00",
                       "productNo": "PRO-STATIC-101",
                       "extendIp": "192.168.1.102,192.168.1.103"
                     },
@@ -124,9 +127,9 @@ public class ProxyOrderIntegrationTest {
                       "status": 3,
                       "renew": 0,
                       "bridges": [],
-                      "openAt": "2026-03-12 09:35:00",
-                      "renewAt": "2026-03-12 09:35:00",
-                      "releaseAt":"2026-03-12 09:35:00",
+                      "openAt": "2026-03-20T05:45:37+08:00",
+                      "renewAt": "2026-03-20T05:45:37+08:00",
+                      "releaseAt":"2026-03-20T05:45:37+08:00",
                       "productNo": "PRO-DYNAMIC-104",
                       "extendIp": null
                     }

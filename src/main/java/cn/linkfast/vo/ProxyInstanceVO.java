@@ -22,7 +22,6 @@ public class ProxyInstanceVO implements Serializable {
     private Integer status;
     private String username;
     private String pwd;
-    private Integer renew;
     private String instanceNo;
     private String orderNo;
     private String productNo;

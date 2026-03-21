@@ -30,7 +30,7 @@ public class ProxyProductServiceImplTest {
     private ProxyProductService productService;
 
     @Test
-    public void testGetProxyProducts2() throws Exception {
+    public void testGetProxyProducts2() {
         // 1. 构建查询条件
         ProxyProductQueryDTO dto = new ProxyProductQueryDTO();
         dto.setCountryCode("US");
@@ -74,9 +74,10 @@ public class ProxyProductServiceImplTest {
     }
 
     @Test
-    public void testGetProxyProducts() throws Exception {
+    public void testGetProxyProducts() {
         // 1. 构造查询 DTO (模拟前端传参)
         // 根据你之前同步成功的日志，数据库中现在应该有国家为 "USA" 或 "CAN" 的数据
+        // http://112.124.51.99/api/proxy-product/list?countryCode=USA&cityCode=USA000000&pageNum=1&pageSize=10
         ProxyProductQueryDTO queryDTO = new ProxyProductQueryDTO();
         queryDTO.setCountryCode("USA"); // 必填，对应 SQL 中的 WHERE country_code = ?
         queryDTO.setCityCode("USA000000"); // 必填，对应 SQL 中的 WHERE city_code = ?

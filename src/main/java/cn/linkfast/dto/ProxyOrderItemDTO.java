@@ -13,6 +13,8 @@ public class ProxyOrderItemDTO {
     private Integer duration;
     private Integer count;
     private Integer cycleTimes;
+    /* 购买项目code */
+//    private String projectId;
 }
 
 

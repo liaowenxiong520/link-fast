@@ -117,7 +117,6 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
         condition.setStatus(queryDto.getStatus());
         condition.setCountryCode(queryDto.getCountryCode());
         condition.setCityCode(queryDto.getCityCode());
-        condition.setRenew(queryDto.getRenew());
         condition.setIp(queryDto.getIp());
 
         if (queryDto.getPageNum() != null && queryDto.getPageSize() != null) {
@@ -161,7 +160,7 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
             }
 
             // 保存或更新到数据库
-            return proxyInstanceDAO.batchSaveOrUpdate(instanceList);
+            return proxyInstanceDAO.batchUpdate(instanceList);
         } else {
             throw new RuntimeException("实例API错误: " + root.path("msg").asText());
         }

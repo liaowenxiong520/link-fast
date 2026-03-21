@@ -1,5 +1,6 @@
 package cn.linkfast.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
@@ -14,6 +15,7 @@ import java.util.List;
  * @since 2026/3/10 20:34
  */
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ProxyOrder {
     private Long id;
     private String orderNo;       // 平台订单编号

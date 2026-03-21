@@ -12,8 +12,10 @@ import cn.linkfast.entity.ProxyOrder;
 import cn.linkfast.entity.ProxyOrderItem;
 import cn.linkfast.entity.ProxyProduct;
 import cn.linkfast.exception.BusinessException;
+import cn.linkfast.service.PayService;
 import cn.linkfast.service.ProxyOrderService;
 import cn.linkfast.utils.ApiPacketUtil;
+import cn.linkfast.vo.PayPasswordVO;
 import cn.linkfast.vo.ProxyOrderCreateVO;
 import cn.linkfast.vo.ProxyOrderVO;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -49,6 +51,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     private final ObjectMapper objectMapper;
     private final ApiPacketUtil apiPacketUtil;
     private final ProxyProductDAO proxyProductDAO;
+    private final PayService payService;
     @Value("${api.ipv.env}")
     private String env;
     @Value("${api.ipv.sandbox_url}")
@@ -101,6 +104,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         Map<String, Object> finalRequest = apiPacketUtil.pack(params);
 
         // 发送 HTTP 请求，返回的是 HTTP 响应体（Response Body）的全文内容
+        log.info("同步订单详情 - 请求URL: {}, 请求参数: {}", fullUrl, objectMapper.writeValueAsString(finalRequest));
         String responseStr = sendPost(fullUrl, finalRequest);
 
         ProxyOrder order = processResponse(responseStr);
@@ -165,6 +169,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     }
 
     private ProxyOrder processResponse(String responseStr) throws Exception {
+        log.info("第三方API原始响应: {}", responseStr);
         JsonNode root = objectMapper.readTree(responseStr);
         if (root.path("code").asInt() == 200) {
             String encryptedData = root.path("data").asText();
@@ -177,6 +182,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             return objectMapper.readValue(decryptedJson, new TypeReference<>() {
             });
         } else {
+            log.error("第三方API返回错误, code={}, msg={}, 完整响应: {}", root.path("code").asInt(), root.path("msg").asText(), responseStr);
             throw new RuntimeException("API错误: " + root.path("msg").asText());
         }
     }
@@ -184,13 +190,19 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProxyOrderCreateVO createProxyOrder(ProxyOrderCreateDTO dto) {
+        // 1. 校验支付密码
+        PayPasswordVO payResult = payService.verifyPayPassword(dto.getPayPassword());
+        if (!payResult.getPassed()) {
+            throw new BusinessException(400, payResult.getMessage());
+        }
+
+        /*
+          userId 目前没有传入参数，暂时写死一个值，后续可以通过鉴权上下文获取当前用户ID，或者在DTO中添加userId字段由调用方传入
+         */
         Long userId = 2032958739262217115L;
         String appOrderNo = userId + "" + System.currentTimeMillis();
         ProxyOrder order = new ProxyOrder();
         order.setAppOrderNo(appOrderNo);
-        /*
-          userId 目前没有传入参数，暂时写死一个值，后续可以通过鉴权上下文获取当前用户ID，或者在DTO中添加userId字段由调用方传入
-         */
         order.setUserId(userId);
         order.setOrderType(dto.getOrderType());
         order.setTotalQuantity(dto.getTotalQuantity());
@@ -207,29 +219,40 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             item.setDuration(itemDto.getDuration());
             item.setCount(itemDto.getCount());
             item.setCycleTimes(itemDto.getCycleTimes());
+            item.setFlow(0);
+            item.setUseBridge(1);
+//            item.setProjectId(itemDto.getProjectId());
 
             // 查库补全其它属性
             if (itemDto.getProductNo() != null) {
                 ProxyProduct product = proxyProductDAO.findProxyProduct(itemDto.getProductNo());
-                if (product != null) {
-                    item.setDetail(product.getDetail());
-                    item.setCostPrice(product.getCostPrice());
-                    item.setRetailPrice(product.getRetailPrice());
-                    item.setIpType(product.getIpType());
-                    item.setIspType(product.getIspType());
-                    item.setNetType(product.getNetType());
-                    item.setBandWidth(product.getBandWidth());
-                    item.setBandWidthPrice(product.getBandWidthPrice());
-                    item.setMaxBandWidth(product.getMaxBandWidth());
-                    item.setFlow(product.getFlow());
-                    item.setCpu(product.getCpu());
-                    item.setMemory(product.getMemory());
-                    item.setSupplierCode(product.getSupplierCode());
-                    item.setIpCount(product.getIpCount());
-                    item.setIpDuration(product.getIpDuration());
-                    item.setParentNo(product.getParentNo());
-                    item.setProxyEverytimeChange(product.getProxyEverytimeChange());
-                    item.setProxyGlobalRandom(product.getProxyGlobalRandom());
+                if (product == null) {
+                    throw new BusinessException(400, "产品不存在: " + itemDto.getProductNo());
+                }
+                item.setUseType(product.getUseType());
+                item.setProtocol(product.getProtocol());
+                item.setUseLimit(product.getUseLimit());
+                item.setAreaCode(product.getAreaCode());
+                item.setDetail(product.getDetail());
+                item.setCostPrice(product.getCostPrice());
+                item.setRetailPrice(product.getRetailPrice());
+                item.setIpType(product.getIpType());
+                item.setIspType(product.getIspType());
+                item.setNetType(product.getNetType());
+                item.setBandWidth(product.getBandWidth());
+                item.setBandWidthPrice(product.getBandWidthPrice());
+                item.setMaxBandWidth(product.getMaxBandWidth());
+                item.setFlow(product.getFlow());
+                item.setCpu(product.getCpu());
+                item.setMemory(product.getMemory());
+                item.setSupplierCode(product.getSupplierCode());
+                item.setIpCount(product.getIpCount());
+                item.setIpDuration(product.getIpDuration());
+                item.setParentNo(product.getParentNo());
+                item.setProxyEverytimeChange(product.getProxyEverytimeChange());
+                item.setProxyGlobalRandom(product.getProxyGlobalRandom());
+                if (product.getProjectList() != null && !product.getProjectList().isEmpty()) {
+                    item.setProjectId(product.getProjectList().get(0).getCode());
                 }
             }
             return item;
@@ -253,6 +276,11 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
                 m.put("duration", item.getDuration());
                 m.put("count", item.getCount());
                 m.put("cycleTimes", item.getCycleTimes());
+                m.put("flow", item.getFlow());
+                m.put("useBridge", item.getUseBridge());
+                if (item.getProjectId() != null) {
+                    m.put("projectId", item.getProjectId());
+                }
                 paramList.add(m);
             }
             bizParams.put("params", paramList);

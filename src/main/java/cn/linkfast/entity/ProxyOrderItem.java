@@ -152,6 +152,11 @@ public class ProxyOrderItem implements Serializable {
     private Integer flow;
 
     /**
+     * 是否使用代理桥接 1-不使用 2-使用
+     */
+    private Integer useBridge;
+
+    /**
      * cpu数
      */
     private Integer cpu;
@@ -230,6 +235,10 @@ public class ProxyOrderItem implements Serializable {
      * 产品是共享还是独享
      */
     private Integer productType;
+    /**
+     * 购买项目code
+     */
+    private String projectId;
     private Date createTime;
     private Date updateTime;
 }

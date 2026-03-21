@@ -24,9 +24,9 @@ public class ProxyInstanceSearchCondition implements Serializable {
     private Integer limit;
 
     /**
-     * 代理类型（必传）
+     * 代理类型（可选，支持多个值；为空或null时不限制）
      */
-    private Integer proxyType;
+    private Integer[] proxyType;
 
     /**
      * 实例状态（必传）
@@ -43,10 +43,6 @@ public class ProxyInstanceSearchCondition implements Serializable {
      */
     private String cityCode;
 
-    /**
-     * 是否自动续费（可选）
-     */
-    private Integer renew;
 
     /**
      * IP地址（可选，模糊查询）

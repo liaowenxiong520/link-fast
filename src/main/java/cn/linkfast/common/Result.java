@@ -43,7 +43,7 @@ public class Result<T> {
         return new Result<>(500, message, null);
     }
 
-    //判断是否成功
+    //判断是否成功，200表示成功，其他表示失败，最终会返回一个属性success，true表示成功，false表示失败
     public boolean isSuccess() {
         return code != null && code == 200;
     }

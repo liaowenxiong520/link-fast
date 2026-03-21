@@ -2,6 +2,7 @@ package cn.linkfast.controller;
 
 
 import cn.linkfast.common.PageResult;
+import cn.linkfast.common.Result;
 import cn.linkfast.dto.ProxyOrderCreateDTO;
 import cn.linkfast.dto.ProxyOrderQueryDTO;
 import cn.linkfast.service.ProxyOrderService;
@@ -27,15 +28,15 @@ public class ProxyOrderController {
      * @return 分页订单VO列表
      */
     @GetMapping("/list")
-    public PageResult<ProxyOrderVO> getProxyOrders(@Validated ProxyOrderQueryDTO dto) {
-        return proxyOrderService.getProxyOrders(dto);
+    public Result<PageResult<ProxyOrderVO>> getProxyOrders(@Validated ProxyOrderQueryDTO dto) {
+        return Result.success(proxyOrderService.getProxyOrders(dto));
     }
 
     /**
      * 开通代理（创建订单）
      */
     @PostMapping("/open")
-    public ProxyOrderCreateVO createProxyOrder(@RequestBody @Validated ProxyOrderCreateDTO dto) {
-        return proxyOrderService.createProxyOrder(dto);
+    public Result<ProxyOrderCreateVO> createProxyOrder(@RequestBody @Validated ProxyOrderCreateDTO dto) {
+        return Result.success(proxyOrderService.createProxyOrder(dto));
     }
 }
