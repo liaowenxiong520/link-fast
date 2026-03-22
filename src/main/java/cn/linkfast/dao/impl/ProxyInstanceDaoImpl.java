@@ -88,7 +88,7 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
     }
 
     @Override
-    public List<ProxyInstance> findProxyInstances(ProxyInstanceSearchCondition condition) {
+    public List<ProxyInstance> selectListByCondition(ProxyInstanceSearchCondition condition) {
         StringBuilder sql = new StringBuilder("SELECT * FROM proxy_instance WHERE status = ? ");
         List<Object> params = new ArrayList<>();
         params.add(condition.getStatus());
@@ -104,7 +104,7 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
     }
 
     @Override
-    public int countProxyInstance(ProxyInstanceSearchCondition condition) {
+    public int countByCondition(ProxyInstanceSearchCondition condition) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(1) FROM proxy_instance WHERE status = ? ");
         List<Object> params = new ArrayList<>();
         params.add(condition.getStatus());

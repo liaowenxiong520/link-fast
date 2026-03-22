@@ -91,18 +91,18 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
     }
 
     @Override
-    public PageResult<ProxyInstanceVO> getProxyInstances(ProxyInstanceQueryDTO queryDto) {
+    public PageResult<ProxyInstanceVO> queryProxyInstances(ProxyInstanceQueryDTO queryDto) {
         // 1. DTO 转 SearchCondition（计算 offset）
         ProxyInstanceSearchCondition condition = buildSearchCondition(queryDto);
 
         // 2. 查询总条数
-        int total = proxyInstanceDAO.countProxyInstance(condition);
+        int total = proxyInstanceDAO.countByCondition(condition);
         if (total == 0) {
             return new PageResult<>(0, List.of(), queryDto.getPageNum(), queryDto.getPageSize());
         }
 
         // 3. 执行数据查询
-        List<ProxyInstance> entityList = proxyInstanceDAO.findProxyInstances(condition);
+        List<ProxyInstance> entityList = proxyInstanceDAO.selectListByCondition(condition);
 
         // 4. Entity 转 VO
         List<ProxyInstanceVO> voList = entityList.stream().map(this::convertToVO).collect(Collectors.toList());

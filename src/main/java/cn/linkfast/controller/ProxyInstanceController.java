@@ -28,8 +28,8 @@ public class ProxyInstanceController {
      * @return 分页实例VO列表
      */
     @GetMapping("/list")
-    public Result<PageResult<ProxyInstanceVO>> getProxyInstanceList(@Validated ProxyInstanceQueryDTO queryDto) {
-        PageResult<ProxyInstanceVO> pageResult = proxyInstanceService.getProxyInstances(queryDto);
+    public Result<PageResult<ProxyInstanceVO>> queryProxyInstances(@Validated ProxyInstanceQueryDTO queryDto) {
+        PageResult<ProxyInstanceVO> pageResult = proxyInstanceService.queryProxyInstances(queryDto);
         return Result.success(pageResult);
     }
 }

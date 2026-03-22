@@ -12,7 +12,7 @@ public interface ProxyOrderDAO {
      *
      * @param order 包含实例列表的订单对象
      */
-    OrderUpdateResultDTO updateProxyOrder(ProxyOrder order);
+    OrderUpdateResultDTO updateByAppOrderNo(ProxyOrder order);
 
     /**
      * 分页查询订单列表
@@ -20,7 +20,7 @@ public interface ProxyOrderDAO {
      * @param condition 查询条件
      * @return 订单实体列表
      */
-    List<ProxyOrder> findProxyOrderList(ProxyOrderSearchCondition condition);
+    List<ProxyOrder> selectListByCondition(ProxyOrderSearchCondition condition);
 
     /**
      * 查询订单总数（分页用）
@@ -28,12 +28,12 @@ public interface ProxyOrderDAO {
      * @param condition 查询条件
      * @return 总条数
      */
-    int countProxyOrder(ProxyOrderSearchCondition condition);
+    int countByCondition(ProxyOrderSearchCondition condition);
 
     /**
      * 回写第三方返回的 orderNo 和 amount（同时更新 proxy_order 和 proxy_order_item）
      */
-    OrderUpdateResultDTO updateProxyOrder(String appOrderNo, String orderNo, java.math.BigDecimal amount);
+    OrderUpdateResultDTO updateByAppOrderNo(String appOrderNo, String orderNo, java.math.BigDecimal amount);
 
     /**
      * 保存订单主数据和项目数据到数据库
@@ -42,7 +42,7 @@ public interface ProxyOrderDAO {
      * @param order 包含主表信息和 items 列表的订单对象
      * @return 保存的订单的 appOrderNo
      */
-    String saveProxyOrder(ProxyOrder order);
+    String insert(ProxyOrder order);
 
     /**
      * 根据渠道商订单号查询单个订单
@@ -50,5 +50,5 @@ public interface ProxyOrderDAO {
      * @param appOrderNo 渠道商订单号
      * @return 订单实体，不存在则返回 null
      */
-    ProxyOrder findProxyOrder(String appOrderNo);
+    ProxyOrder selectByAppOrderNo(String appOrderNo);
 }

@@ -16,7 +16,7 @@ import java.text.SimpleDateFormat;
 @ComponentScan(
         basePackages = {"cn.linkfast"},
         excludeFilters = {
-                // 纠正点：排除掉 Controller，交给 WebMvcConfig 去扫描
+                // 排除掉 Controller，交给 WebMvcConfig 去扫描
                 @ComponentScan.Filter(type = FilterType.ANNOTATION, value = Controller.class),
                 @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, value = WebMvcConfig.class)
         }

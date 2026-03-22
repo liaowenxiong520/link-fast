@@ -37,7 +37,7 @@ public class ProxyProductControllerTest {
      * 预期：返回 400，参数校验失败
      */
     @Test
-    public void testGetProxyProductListWithoutParams() throws Exception {
+    public void testQueryProxyProductsWithoutParams() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/proxy-product/list"))
                 .andDo(print())
                 .andReturn();

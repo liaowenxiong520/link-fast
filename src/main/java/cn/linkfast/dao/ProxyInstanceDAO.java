@@ -24,7 +24,7 @@ public interface ProxyInstanceDAO {
      * @param condition 查询条件
      * @return 实例列表
      */
-    List<ProxyInstance> findProxyInstances(ProxyInstanceSearchCondition condition);
+    List<ProxyInstance> selectListByCondition(ProxyInstanceSearchCondition condition);
 
     /**
      * 根据查询条件统计代理实例总数
@@ -32,6 +32,6 @@ public interface ProxyInstanceDAO {
      * @param condition 查询条件
      * @return 总条数
      */
-    int countProxyInstance(ProxyInstanceSearchCondition condition);
+    int countByCondition(ProxyInstanceSearchCondition condition);
 }
 

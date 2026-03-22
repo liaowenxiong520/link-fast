@@ -1,6 +1,6 @@
 package cn.linkfast.service;
 
-import cn.linkfast.vo.AreaVO;
+import cn.linkfast.vo.AreaDTO;
 
 import java.util.List;
 
@@ -15,6 +15,6 @@ public interface AreaService {
      * @param codes 地域代码列表，为null时获取全部
      * @return 地域树形列表
      */
-    List<AreaVO> queryAreaTree(List<String> codes);
+    List<AreaDTO> queryAreaTree(List<String> codes);
 }
 

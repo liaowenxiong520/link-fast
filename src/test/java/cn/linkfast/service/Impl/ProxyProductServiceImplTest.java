@@ -30,7 +30,7 @@ public class ProxyProductServiceImplTest {
     private ProxyProductService productService;
 
     @Test
-    public void testGetProxyProducts2() {
+    public void testQueryProxyProducts2() {
         // 1. 构建查询条件
         ProxyProductQueryDTO dto = new ProxyProductQueryDTO();
         dto.setCountryCode("US");
@@ -38,7 +38,7 @@ public class ProxyProductServiceImplTest {
         dto.setPageSize(10);
 
         // 2. 调用业务逻辑
-        PageResult<ProxyProductVO> result = productService.getProxyProducts(dto);
+        PageResult<ProxyProductVO> result = productService.queryProxyProducts(dto);
 
         // 3. 断言验证
         assertNotNull(result, "返回结果不应为 null");
@@ -74,7 +74,7 @@ public class ProxyProductServiceImplTest {
     }
 
     @Test
-    public void testGetProxyProducts() {
+    public void testQueryProxyProducts() {
         // 1. 构造查询 DTO (模拟前端传参)
         // 根据你之前同步成功的日志，数据库中现在应该有国家为 "USA" 或 "CAN" 的数据
         // http://112.124.51.99/api/proxy-product/list?countryCode=USA&cityCode=USA000000&pageNum=1&pageSize=10
@@ -87,7 +87,7 @@ public class ProxyProductServiceImplTest {
         System.out.println(">>> 开始测试获取代理产品列表...");
 
         // 2. 调用 Service 方法
-        PageResult<ProxyProductVO> pageResult = productService.getProxyProducts(queryDTO);
+        PageResult<ProxyProductVO> pageResult = productService.queryProxyProducts(queryDTO);
 
         // 3. 验证结果
         // 验证结果对象不为空

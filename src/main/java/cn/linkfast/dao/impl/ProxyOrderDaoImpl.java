@@ -28,7 +28,7 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
     private final ObjectMapper objectMapper;
 
     @Override
-    public OrderUpdateResultDTO updateProxyOrder(ProxyOrder order) {
+    public OrderUpdateResultDTO updateByAppOrderNo(ProxyOrder order) {
         // 仅更新订单主表（proxy_order 在此场景下不存在插入的情况）
         String orderSql = "UPDATE proxy_order SET order_no=?, order_type=?, status=?, total_quantity=?, amount=?, has_refund=?, instance_total=? WHERE app_order_no=?";
         List<Object> params = new ArrayList<>();
@@ -80,7 +80,7 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
      * @return 订单列表
      */
     @Override
-    public List<ProxyOrder> findProxyOrderList(ProxyOrderSearchCondition condition) {
+    public List<ProxyOrder> selectListByCondition(ProxyOrderSearchCondition condition) {
         // 1. 动态拼接SQL
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT * FROM proxy_order WHERE 1=1 ");
@@ -118,7 +118,7 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
      * 查询订单总数（仅统计符合条件的条数）
      */
     @Override
-    public int countProxyOrder(ProxyOrderSearchCondition condition) {
+    public int countByCondition(ProxyOrderSearchCondition condition) {
         // 1. 动态拼接统计SQL
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT COUNT(1) FROM proxy_order WHERE 1=1 ");
@@ -163,7 +163,7 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
      * 回写第三方返回的 orderNo 和 amount（同时更新 proxy_order 和 proxy_order_item）
      */
     @Override
-    public OrderUpdateResultDTO updateProxyOrder(String appOrderNo, String orderNo, BigDecimal amount) {
+    public OrderUpdateResultDTO updateByAppOrderNo(String appOrderNo, String orderNo, BigDecimal amount) {
         // 1. 更新主订单表
         String orderSql = "UPDATE proxy_order SET order_no=?, amount=? WHERE app_order_no=?";
         int proxyOrderUpdatedRows = jdbcTemplate.update(orderSql, orderNo, amount, appOrderNo);
@@ -184,7 +184,7 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
      * @param order 包含主表信息和 items 列表的订单对象
      * @return 保存的订单的 appOrderNo（便于后续业务使用）
      */
-    public String saveProxyOrder(ProxyOrder order) {
+    public String insert(ProxyOrder order) {
 
         // 1. 插入主表数据（纯插入，不做更新）
         String orderSql = "INSERT INTO proxy_order (order_no, app_order_no, user_id, order_type, status, total_quantity, amount, has_refund, instance_total, create_time, update_time) " + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
@@ -224,7 +224,7 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
      * @return 订单实体，不存在则返回 null
      */
     @Override
-    public ProxyOrder findProxyOrder(String appOrderNo) {
+    public ProxyOrder selectByAppOrderNo(String appOrderNo) {
         String sql = "SELECT * FROM proxy_order WHERE app_order_no = ?";
         List<ProxyOrder> results = jdbcTemplate.query(sql, new BeanPropertyRowMapper<>(ProxyOrder.class), appOrderNo);
         return results.isEmpty() ? null : results.get(0);

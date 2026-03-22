@@ -20,5 +20,5 @@ public interface ProxyProductService {
     /**
      * 分页查询本地代理产品列表
      */
-    PageResult<ProxyProductVO> getProxyProducts(ProxyProductQueryDTO queryDto);
+    PageResult<ProxyProductVO> queryProxyProducts(ProxyProductQueryDTO queryDto);
 }

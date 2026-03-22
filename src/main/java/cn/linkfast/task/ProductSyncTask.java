@@ -25,10 +25,10 @@ public class ProductSyncTask {
     private final ProxyProductService proxyProductService;
 
     /**
-     * 定时同步任务：每小时执行一次
-     * Cron 表达式：秒 分 时 日 月 周
+     * 定时同步任务：每天凌晨 1 点执行一次
+     * Cron 表达式（Spring 6 域）：秒 分 时 日 月 周
      */
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 0 1 * * *")
     public void executeSyncJob() {
         log.info("============== [定时任务] 开始同步第三方代理产品数据 ==============");
         // 1. 根据文档要求构造参数：proxyType 是必填的 []int 类型

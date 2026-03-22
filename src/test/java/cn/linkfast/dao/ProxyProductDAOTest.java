@@ -20,11 +20,11 @@ public class ProxyProductDAOTest {
 
     @Test
     @DisplayName("根据productNo查询产品，验证retail_price是否为null")
-    public void testFindProxyProduct() {
+    public void testSelectByProductNo() {
         String productNo = "ipv_gnmr4u5rx";
 
         // 1. 查询产品
-        ProxyProduct product = proxyProductDAO.findProxyProduct(productNo);
+        ProxyProduct product = proxyProductDAO.selectByProductNo(productNo);
 
         // 2. 断言产品存在
         assertNotNull(product, "产品应存在，productNo=" + productNo);

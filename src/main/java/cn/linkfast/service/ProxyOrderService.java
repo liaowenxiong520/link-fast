@@ -21,7 +21,7 @@ public interface ProxyOrderService {
      * @param dto 入参DTO
      * @return 分页VO结果
      */
-    PageResult<ProxyOrderVO> getProxyOrders(ProxyOrderQueryDTO dto);
+    PageResult<ProxyOrderVO> queryProxyOrders(ProxyOrderQueryDTO dto);
 
     /**
      * 开通代理（创建订单）
@@ -34,5 +34,5 @@ public interface ProxyOrderService {
      * @param appOrderNo 渠道商订单号
      * @return 订单VO
      */
-    ProxyOrderVO getProxyOrder(String appOrderNo);
+    ProxyOrderVO getProxyOrderByAppOrderNo(String appOrderNo);
 }

@@ -11,9 +11,9 @@ public interface ProxyProductDAO {
      */
     int batchSaveOrUpdate(List<ProxyProduct> products);
 
-    List<ProxyProduct> findProxyProductList(ProxyProductSearchCondition condition);
+    List<ProxyProduct> selectListByCondition(ProxyProductSearchCondition condition);
 
-    int countProxyProduct(ProxyProductSearchCondition condition);
+    int count(ProxyProductSearchCondition condition);
 
     /**
      * 根据产品编号查询单个代理产品
@@ -21,5 +21,5 @@ public interface ProxyProductDAO {
      * @param productNo 产品编号
      * @return 代理产品信息
      */
-    ProxyProduct findProxyProduct(String productNo);
+    ProxyProduct selectByProductNo(String productNo);
 }

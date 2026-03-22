@@ -27,8 +27,8 @@ public class ProxyProductController {
      * 例如：/api/proxy/list?countryCode=US&page=1&pageSize=10
      */
     @GetMapping("/list")
-    public Result<PageResult<ProxyProductVO>> getProxyProductList(@Validated ProxyProductQueryDTO queryDto) {
-        PageResult<ProxyProductVO> pageResult = productService.getProxyProducts(queryDto);
+    public Result<PageResult<ProxyProductVO>> queryProxyProducts(@Validated ProxyProductQueryDTO queryDto) {
+        PageResult<ProxyProductVO> pageResult = productService.queryProxyProducts(queryDto);
         return Result.success(pageResult);
     }
 }

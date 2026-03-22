@@ -28,8 +28,8 @@ public class ProxyOrderController {
      * @return 分页订单VO列表
      */
     @GetMapping("/list")
-    public Result<PageResult<ProxyOrderVO>> getProxyOrders(@Validated ProxyOrderQueryDTO dto) {
-        return Result.success(proxyOrderService.getProxyOrders(dto));
+    public Result<PageResult<ProxyOrderVO>> queryProxyOrders(@Validated ProxyOrderQueryDTO dto) {
+        return Result.success(proxyOrderService.queryProxyOrders(dto));
     }
 
     /**

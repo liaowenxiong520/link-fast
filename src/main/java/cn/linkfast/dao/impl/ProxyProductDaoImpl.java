@@ -176,8 +176,7 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
             int successCount = 0;
             for (int r : results) {
                 // r = 1 (新增), r = 2 (更新), r = 0 (无变化)
-                // 只要 r >= 0，都说明这条记录在数据库里处理成功了
-                if (r >= 0) {
+                if (r > 0) {
                     successCount++;
                 }
             }
@@ -191,7 +190,7 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
     }
 
     @Override
-    public int countProxyProduct(ProxyProductSearchCondition condition) {
+    public int count(ProxyProductSearchCondition condition) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM proxy_product");
         List<Object> params = new ArrayList<>();
         buildQueryCondition(params, condition, sql);
@@ -201,7 +200,7 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
     }
 
     @Override
-    public List<ProxyProduct> findProxyProductList(ProxyProductSearchCondition condition) {
+    public List<ProxyProduct> selectListByCondition(ProxyProductSearchCondition condition) {
         List<Object> params = new ArrayList<>();
         StringBuilder sql = new StringBuilder("SELECT * FROM proxy_product ");
         //拼接查询条件
@@ -268,8 +267,8 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
             log.error("JSON解析失败，返回空集合: {}", json, e);
             return (T) new ArrayList<>();
         }
-    }
 
+    }
     /**
      * 根据产品编号查询单个代理产品
      *
@@ -277,7 +276,7 @@ public class ProxyProductDaoImpl implements ProxyProductDAO {
      * @return 代理产品信息
      */
     @Override
-    public ProxyProduct findProxyProduct(String productNo) {
+    public ProxyProduct selectByProductNo(String productNo) {
         String sql = "SELECT * FROM proxy_product WHERE product_no = ?";
         List<ProxyProduct> results = jdbcTemplate.query(sql, proxyProductRowMapper, new Object[]{productNo});
         return results.isEmpty() ? null : results.get(0);

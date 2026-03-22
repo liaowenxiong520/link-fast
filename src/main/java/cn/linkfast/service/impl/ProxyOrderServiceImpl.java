@@ -121,7 +121,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
 
         // 通过 appOrderNo 查询本地订单，获取 userId 赋值给每个实例
         if (order.getInstances() != null && !order.getInstances().isEmpty()) {
-            ProxyOrder localOrder = proxyOrderDAO.findProxyOrder(order.getAppOrderNo());
+            ProxyOrder localOrder = proxyOrderDAO.selectByAppOrderNo(order.getAppOrderNo());
             if (localOrder != null && localOrder.getUserId() != null) {
                 for (ProxyInstance instance : order.getInstances()) {
                     instance.setUserId(localOrder.getUserId());
@@ -129,17 +129,17 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             }
         }
 
-        return proxyOrderDAO.updateProxyOrder(order);
+        return proxyOrderDAO.updateByAppOrderNo(order);
     }
 
     @Override
-    public PageResult<ProxyOrderVO> getProxyOrders(ProxyOrderQueryDTO dto) {
+    public PageResult<ProxyOrderVO> queryProxyOrders(ProxyOrderQueryDTO dto) {
         // 1. DTO转换为DAO查询条件
         ProxyOrderSearchCondition condition = buildSearchCondition(dto);
 
         // 2. 调用DAO查询数据（列表+总数）
-        List<ProxyOrder> orderList = proxyOrderDAO.findProxyOrderList(condition);
-        int total = proxyOrderDAO.countProxyOrder(condition);
+        List<ProxyOrder> orderList = proxyOrderDAO.selectListByCondition(condition);
+        int total = proxyOrderDAO.countByCondition(condition);
 
         // 3. 实体转换为VO（包含instanceTotal）
         // 4. 将 Entity 转换为 VO (数据脱敏/格式转换)
@@ -225,7 +225,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
 
             // 查库补全其它属性
             if (itemDto.getProductNo() != null) {
-                ProxyProduct product = proxyProductDAO.findProxyProduct(itemDto.getProductNo());
+                ProxyProduct product = proxyProductDAO.selectByProductNo(itemDto.getProductNo());
                 if (product == null) {
                     throw new BusinessException(400, "产品不存在: " + itemDto.getProductNo());
                 }
@@ -258,7 +258,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             return item;
         }).collect(Collectors.toList());
         order.setItems(items);
-        proxyOrderDAO.saveProxyOrder(order);
+        proxyOrderDAO.insert(order);
         String orderNo = null;
         java.math.BigDecimal amount = null;
         try {
@@ -291,7 +291,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             if (respOrder != null) {
                 orderNo = respOrder.getOrderNo();
                 amount = respOrder.getAmount();
-                OrderUpdateResultDTO updateResult = proxyOrderDAO.updateProxyOrder(appOrderNo, orderNo, amount);
+                OrderUpdateResultDTO updateResult = proxyOrderDAO.updateByAppOrderNo(appOrderNo, orderNo, amount);
                 // 校验主订单更新行数，预期更新 1 条
                 if (updateResult.getProxyOrderUpdatedRows() != 1) {
                     throw new BusinessException("回写订单失败，主订单预期更新1条，实际更新" + updateResult.getProxyOrderUpdatedRows() + "条，appOrderNo=" + appOrderNo);
@@ -315,8 +315,8 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     }
 
     @Override
-    public ProxyOrderVO getProxyOrder(String appOrderNo) {
-        ProxyOrder order = proxyOrderDAO.findProxyOrder(appOrderNo);
+    public ProxyOrderVO getProxyOrderByAppOrderNo(String appOrderNo) {
+        ProxyOrder order = proxyOrderDAO.selectByAppOrderNo(appOrderNo);
         if (order == null) {
             return null;
         }

@@ -1,8 +1,8 @@
 package cn.linkfast.controller;
 
 import cn.linkfast.common.Result;
-import cn.linkfast.service.AreaService;
-import cn.linkfast.vo.AreaVO;
+import cn.linkfast.service.RegionService;
+import cn.linkfast.vo.AreaDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,9 +17,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/area")
-public class AreaController {
+public class RegionController {
 
-    private final AreaService areaService;
+    private final RegionService regionService;
 
     /**
      * 获取地域树形列表
@@ -28,9 +28,9 @@ public class AreaController {
      * @return 地域树形数据
      */
     @GetMapping("/tree")
-    public Result<List<AreaVO>> getAreaTree(
+    public Result<List<AreaDTO>> queryRegionTree(
             @RequestParam(value = "codes", required = false) List<String> codes) {
-        List<AreaVO> areaTree = areaService.queryAreaTree(codes);
+        List<AreaDTO> areaTree = regionService.queryRegionTree(codes);
         return Result.success(areaTree);
     }
 }

@@ -23,6 +23,6 @@ public interface ProxyInstanceService {
      * @param queryDto 查询入参
      * @return 分页VO结果
      */
-    PageResult<ProxyInstanceVO> getProxyInstances(ProxyInstanceQueryDTO queryDto);
+    PageResult<ProxyInstanceVO> queryProxyInstances(ProxyInstanceQueryDTO queryDto);
 }
 
