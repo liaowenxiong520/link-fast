@@ -54,7 +54,7 @@ public class ProxyRegionDaoImpl implements ProxyRegionDAO {
 
     private int batchSaveOrUpdateChunk(List<ProxyRegion> proxyRegions) {
         // 注意：ON DUPLICATE KEY 依赖 region_code 的唯一索引（uk_region_code）
-        String sql = "INSERT INTO region (" +
+        String sql = "INSERT INTO proxy_region (" +
                 "parent_id, level, region_code, region_name, region_en_name, sort, full_code, full_name, status" +
                 ") VALUES (" +
                 "?, ?, ?, ?, ?, ?, ?, ?, ?" +
@@ -125,7 +125,7 @@ public class ProxyRegionDaoImpl implements ProxyRegionDAO {
         }
         String sql = "SELECT id, parent_id, level, region_code, region_name, region_en_name, " +
                 "sort, full_code, full_name, status, create_time, update_time " +
-                "FROM region WHERE region_code = ?";
+                "FROM proxy_region WHERE region_code = ?";
         List<ProxyRegion> list = jdbcTemplate.query(sql, (rs, rowNum) -> {
             ProxyRegion r = new ProxyRegion();
             r.setId(rs.getLong("id"));

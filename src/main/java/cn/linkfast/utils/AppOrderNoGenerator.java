@@ -2,7 +2,6 @@ package cn.linkfast.utils;
 
 import cn.hutool.core.lang.Snowflake;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**

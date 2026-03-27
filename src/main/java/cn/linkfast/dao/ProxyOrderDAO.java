@@ -1,8 +1,7 @@
 package cn.linkfast.dao;
 
-import cn.linkfast.dto.ProxyOrderUpdateResultDTO;
-import cn.linkfast.dto.ProxyPurchaseOrderUpdateResultDTO;
 import cn.linkfast.dto.ProxyOrderSearchCondition;
+import cn.linkfast.dto.ProxyOrderUpdateResultDTO;
 import cn.linkfast.entity.ProxyOrder;
 
 import java.math.BigDecimal;
