@@ -7,6 +7,7 @@ import cn.linkfast.dto.ProxyProductSearchCondition;
 import cn.linkfast.entity.ProxyProduct;
 import cn.linkfast.service.ProxyProductService;
 import cn.linkfast.utils.ApiPacketUtil;
+import cn.linkfast.utils.HttpClientUtil;
 import cn.linkfast.vo.ProxyProductVO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,17 +16,10 @@ import jakarta.annotation.PostConstruct;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -89,6 +83,23 @@ public class ProxyProductServiceImpl implements ProxyProductService {
         }
     }
 
+
+    @Override
+    public List<ProxyProduct> getProxyProducts(Map<String, Object> params) throws Exception {
+
+        // 拼接完整的请求 URL
+        String fullUrl = baseUrl + productQueryPath;
+
+        // 业务参数转成最终的请求参数
+        Map<String, Object> finalRequest = apiPacketUtil.pack(params);
+
+        // 发送 HTTP 请求并获取响应字符串
+        String responseStr = HttpClientUtil.sendPost(fullUrl, finalRequest, objectMapper);
+
+        // 解析响应并解密，得到 ProxyProduct 列表
+        return processResponse(responseStr);
+    }
+
     @Override
     public int syncProxyProducts(Map<String, Object> params) throws Exception {
 
@@ -99,7 +110,7 @@ public class ProxyProductServiceImpl implements ProxyProductService {
         Map<String, Object> finalRequest = apiPacketUtil.pack(params);
 
         // 发送 HTTP 请求并获取响应字符串
-        String responseStr = sendPost(fullUrl, finalRequest);
+        String responseStr = HttpClientUtil.sendPost(fullUrl, finalRequest, objectMapper);
 
         // 解析响应并解密，得到 ProxyProduct 列表
         List<ProxyProduct> products = processResponse(responseStr);
@@ -160,34 +171,5 @@ public class ProxyProductServiceImpl implements ProxyProductService {
         }
     }
 
-
-    /**
-     * 简单的 HttpClient 发送方法
-     */
-    private String sendPost(String url, Map<String, Object> body) throws Exception {
-        // 1. 创建客户端（建议生产环境下将 client 提取为全局变量或使用连接池）
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-
-            // 2. 构造请求对象
-            HttpPost post = new HttpPost(url);
-            String json = objectMapper.writeValueAsString(body);
-
-            // 3. 设置请求体，HC5 推荐直接在 StringEntity 中指定 ContentType
-            post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
-
-            // 4. 使用 ResponseHandler 模式执行请求
-            // 这种方式会自动管理 HttpResponse 的生命周期，确保流被关闭
-            return client.execute(post, response -> {
-                int status = response.getCode();
-                // 判断Http响应状态码是否在200-300之间，在则表示请求成功，否则表示请求失败，返回错误信息
-                if (status >= 200 && status < 300) {
-                    return EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
-                } else {
-                    log.error("HTTP 请求失败，状态码: {}", status);
-                    return "{\"code\":" + status + ", \"msg\":\"HTTP Error\"}";
-                }
-            });
-        }
-    }
 
 }

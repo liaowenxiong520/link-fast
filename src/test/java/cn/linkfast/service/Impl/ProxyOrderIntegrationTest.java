@@ -3,10 +3,12 @@ package cn.linkfast.service.Impl;
 import cn.linkfast.config.AppConfig;
 import cn.linkfast.dao.ProxyOrderDAO;
 import cn.linkfast.dao.ProxyProductDAO;
-import cn.linkfast.dto.OrderUpdateResultDTO;
+import cn.linkfast.dto.ProxyOrderUpdateResultDTO;
 import cn.linkfast.service.PayService;
+import cn.linkfast.service.ProxyProductService;
 import cn.linkfast.service.impl.ProxyOrderServiceImpl;
 import cn.linkfast.utils.ApiPacketUtil;
+import cn.linkfast.utils.AppOrderNoGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,11 +47,15 @@ public class ProxyOrderIntegrationTest {
     private ProxyProductDAO proxyProductDAO;
     @Autowired
     private PayService payService;
+    @Autowired
+    private ProxyProductService proxyProductService;
+    @Autowired
+    private AppOrderNoGenerator appOrderNoGenerator;
 
     @BeforeEach
     void setUp() {
         // 1. 手动构造 Service 实例
-        ProxyOrderServiceImpl realService = new ProxyOrderServiceImpl(proxyOrderDAO, objectMapper, apiPacketUtil, proxyProductDAO, payService);
+        ProxyOrderServiceImpl realService = new ProxyOrderServiceImpl(proxyOrderDAO, objectMapper, apiPacketUtil, proxyProductDAO, payService, appOrderNoGenerator, proxyProductService);
 
         // 2. 将实例包装为 Mockito Spy
         proxyOrderServiceSpy = spy(realService);
@@ -154,7 +160,7 @@ public class ProxyOrderIntegrationTest {
 
         // 调用 spy 对象的方法
         // 流程：syncOrderDetails -> (Spy拦截)sendPost -> (真实)processResponse -> (Mock拦截)unpack -> (真实)DAO.updateProxyOrder
-        OrderUpdateResultDTO result = proxyOrderServiceSpy.syncOrderDetails(params);
+        ProxyOrderUpdateResultDTO result = proxyOrderServiceSpy.syncOrderDetails(params);
 
         // --- 4. 验证结果 ---
 
@@ -162,11 +168,11 @@ public class ProxyOrderIntegrationTest {
 
         // 验证数据库影响行数（由于是真实 DAO 执行，且 SQL 是 ON DUPLICATE KEY UPDATE）
         // 如果是第一次插入，rows 应该是 1；如果是更新，rows 可能是 2（MySQL 特性）
-        assertTrue(result.getProxyOrderUpdatedRows() >= 0, "主表应该处理成功");
-        assertTrue(result.getProxyInstanceUpdatedRows() >= 0, "子表应该处理成功");
+        assertTrue(result.getOrderUpdatedRows() >= 0, "主表应该处理成功");
+        assertTrue(result.getInstanceUpdatedRows() >= 0, "子表应该处理成功");
 
         System.out.println("集成测试通过！");
-        System.out.println("主表更新行数: " + result.getProxyOrderUpdatedRows());
-        System.out.println("子表更新行数: " + result.getProxyInstanceUpdatedRows());
+        System.out.println("订单表更新行数: " + result.getOrderUpdatedRows());
+        System.out.println("代理实例表更新行数: " + result.getInstanceUpdatedRows());
     }
 }

@@ -1,7 +1,7 @@
 package cn.linkfast.controller;
 
 import cn.linkfast.common.Result;
-import cn.linkfast.dto.OrderUpdateResultDTO;
+import cn.linkfast.dto.ProxyOrderUpdateResultDTO;
 import cn.linkfast.service.ProxyInstanceService;
 import cn.linkfast.service.ProxyOrderService;
 import cn.linkfast.service.ProxyProductService;
@@ -67,9 +67,9 @@ public class ProxyCallbackController {
             params.put("orderNo", no);
             params.put("pageSize", 100);
             try {
-                OrderUpdateResultDTO result = proxyOrderService.syncOrderDetails(params);
+                ProxyOrderUpdateResultDTO result = proxyOrderService.syncOrderDetails(params);
                 log.info("<<< 订单 {} 同步成功，更新订单 {} 行，更新实例 {} 行",
-                        no, result.getProxyOrderUpdatedRows(), result.getProxyInstanceUpdatedRows());
+                        no, result.getOrderUpdatedRows(), result.getInstanceUpdatedRows());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

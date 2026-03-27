@@ -1,0 +1,39 @@
+package cn.linkfast.dto;
+
+import lombok.Data;
+
+/**
+ * 订单更新结果返回类，封装订单主表、子表的更新条数，支持扩展通用返回字段
+ *
+ * @author liaowenxiong
+ * @version 1.0
+ * @since 2026/3/11 09:35
+ */
+@Data
+public class ProxyOrderUpdateResultDTO {
+    /**
+     * 订单主表更新条数
+     */
+    private int orderUpdatedRows;
+    /**
+     * 代理实例更新条数
+     */
+    private int instanceUpdatedRows;
+
+    /**
+     * 订单明细表更新条数
+     */
+    private int orderItemUpdatedRows;
+
+    // 基础构造器（仅包含核心字段）
+    public ProxyOrderUpdateResultDTO(int orderUpdatedRows, int instanceUpdatedRows, int orderItemUpdatedRows) {
+        this.orderUpdatedRows = orderUpdatedRows;
+        this.instanceUpdatedRows = instanceUpdatedRows;
+        this.orderItemUpdatedRows = orderItemUpdatedRows;
+
+    }
+
+    // 默认构造器（无参）
+    public ProxyOrderUpdateResultDTO() {
+    }
+}

@@ -1,4 +1,4 @@
-CREATE TABLE `region` (
+CREATE TABLE `proxyRegion` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `parent_id` bigint unsigned NOT NULL DEFAULT '0' COMMENT '父节点ID，顶级节点（大洲）parent_id=0',
   `level` tinyint NOT NULL COMMENT '层级：1=大洲，2=国家，3=州/省，4=城市',

@@ -1,8 +1,8 @@
 package cn.linkfast.controller;
 
 import cn.linkfast.common.Result;
-import cn.linkfast.service.RegionService;
-import cn.linkfast.vo.AreaDTO;
+import cn.linkfast.service.ProxyRegionService;
+import cn.linkfast.dto.AreaDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,9 +17,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/area")
-public class RegionController {
+public class ProxyRegionController {
 
-    private final RegionService regionService;
+    private final ProxyRegionService proxyRegionService;
 
     /**
      * 获取地域树形列表
@@ -30,7 +30,7 @@ public class RegionController {
     @GetMapping("/tree")
     public Result<List<AreaDTO>> queryRegionTree(
             @RequestParam(value = "codes", required = false) List<String> codes) {
-        List<AreaDTO> areaTree = regionService.queryRegionTree(codes);
+        List<AreaDTO> areaTree = proxyRegionService.queryRegionTree(codes);
         return Result.success(areaTree);
     }
 }

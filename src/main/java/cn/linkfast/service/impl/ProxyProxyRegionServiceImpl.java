@@ -1,28 +1,22 @@
 package cn.linkfast.service.impl;
 
-import cn.linkfast.dao.RegionDAO;
-import cn.linkfast.entity.Region;
+import cn.linkfast.dao.ProxyRegionDAO;
+import cn.linkfast.entity.ProxyRegion;
 import cn.linkfast.exception.BusinessException;
-import cn.linkfast.service.RegionService;
+import cn.linkfast.service.ProxyRegionService;
 import cn.linkfast.utils.ApiPacketUtil;
-import cn.linkfast.vo.AreaDTO;
+import cn.linkfast.utils.HttpClientUtil;
+import cn.linkfast.dto.AreaDTO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,11 +26,11 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RegionServiceImpl implements RegionService {
+public class ProxyProxyRegionServiceImpl implements ProxyRegionService {
 
     private final ObjectMapper objectMapper;
     private final ApiPacketUtil apiPacketUtil;
-    private final RegionDAO regionDAO;
+    private final ProxyRegionDAO proxyRegionDAO;
 
     @Value("${api.ipv.env}")
     private String env;
@@ -78,7 +72,7 @@ public class RegionServiceImpl implements RegionService {
 
             // 3. 发送请求
             String fullUrl = baseUrl + areaListPath;
-            String responseStr = sendPost(fullUrl, finalRequest);
+            String responseStr = HttpClientUtil.sendPost(fullUrl, finalRequest, objectMapper);
 
             // 4. 解析响应并解密
             return processResponse(responseStr);
@@ -90,16 +84,16 @@ public class RegionServiceImpl implements RegionService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public int syncRegionTreeToDb(List<String> codes) throws Exception {
-        // 1. 请求第三方“获取地域信息接口”
+        // 1. 请求第三方「获取地域信息接口」— 放在事务外，避免 HTTP 耗时占用数据库连接
         Map<String, Object> params = new HashMap<>();
         if (codes != null && !codes.isEmpty()) {
             params.put("codes", codes);
         }
         Map<String, Object> finalRequest = apiPacketUtil.pack(params);
         String fullUrl = baseUrl + areaListPath;
-        String responseStr = sendPost(fullUrl, finalRequest);
+        System.out.println("向第三方API发送请求：" + fullUrl);
+        String responseStr = HttpClientUtil.sendPost(fullUrl, finalRequest, objectMapper);
 
         // 2. 处理响应：解密 data -> 反序列化为树形 AreaDTO
         List<AreaDTO> tree = processResponse(responseStr);
@@ -108,23 +102,38 @@ public class RegionServiceImpl implements RegionService {
             return 0;
         }
 
-        // 2. 扁平化为 Region 集合，并记录 parentCode 以便后续回填 parent_id
-        List<Region> regionList = new ArrayList<>();
+        // 3. 扁平化为 ProxyRegion 集合，并记录 parentCode 以便后续回填 parent_id
+        List<ProxyRegion> proxyRegionList = new ArrayList<>();
         Map<String, String> regionCodeToParentCode = new HashMap<>();
-        flattenTree(tree, null, 1, new ArrayList<>(), new ArrayList<>(), regionList, regionCodeToParentCode);
-
-        if (regionList.isEmpty()) {
+        Set<String> seenCodes = new LinkedHashSet<>();
+        flattenTree(tree, null, 1, new ArrayList<>(), new ArrayList<>(), proxyRegionList, regionCodeToParentCode, seenCodes);
+        log.info("地域列表中的元素总数 {}", proxyRegionList.size());
+        if (proxyRegionList.isEmpty()) {
             return 0;
         }
 
-        // 3. 第一次 upsert：region_code 唯一，先把节点写入（parent_id 暂时可能为 0）
-        regionDAO.batchSaveOrUpdate(regionList);
+        // 4. 将数据库操作委托给独立的事务方法（短事务），避免长事务占用连接
+        return doSyncToDb(proxyRegionList, regionCodeToParentCode);
+    }
 
-        // 4. 查询写入后的 id，回填 parent_id
-        List<String> regionCodes = regionList.stream().map(Region::getRegionCode).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+    /**
+     * 真正执行数据库 upsert 的事务方法。
+     * 拆分出来是为了将事务范围缩小到纯 DB 操作，不包含 HTTP 请求等耗时逻辑。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int doSyncToDb(List<ProxyRegion> proxyRegionList, Map<String, String> regionCodeToParentCode) {
+        // 4.1 第一次 upsert：region_code 唯一，先把节点写入（parent_id 暂时为 0）
+        int batchModifiedCount = proxyRegionDAO.batchSaveOrUpdate(proxyRegionList);
 
-        Map<String, Long> idMap = regionDAO.selectIdMapByRegionCodes(regionCodes);
-        for (Region r : regionList) {
+        // 4.2 查询写入后的 id，回填 parent_id
+        List<String> regionCodes = proxyRegionList.stream()
+                .map(ProxyRegion::getRegionCode)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<String, Long> idMap = proxyRegionDAO.selectIdMapByRegionCodes(regionCodes);
+        for (ProxyRegion r : proxyRegionList) {
             String parentCode = regionCodeToParentCode.get(r.getRegionCode());
             if (parentCode == null) {
                 r.setParentId(0L);
@@ -132,7 +141,6 @@ public class RegionServiceImpl implements RegionService {
             }
             Long parentId = idMap.get(parentCode);
             if (parentId == null) {
-                // 理论上不应该发生：因为我们上面已经同步了完整树
                 log.warn("地域同步：找不到 parentId，regionCode={}, parentCode={}", r.getRegionCode(), parentCode);
                 r.setParentId(0L);
             } else {
@@ -140,17 +148,10 @@ public class RegionServiceImpl implements RegionService {
             }
         }
 
-        // 5. 第二次 upsert：更新 parent_id
-        regionDAO.batchSaveOrUpdate(regionList);
-        return regionList.size();
-    }
-
-    private String sendPost(String url, Map<String, Object> body) throws Exception {
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpPost post = new HttpPost(url);
-            post.setEntity(new StringEntity(objectMapper.writeValueAsString(body), ContentType.APPLICATION_JSON));
-            return client.execute(post, response -> EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8));
-        }
+        // 4.3 第二次 upsert：更新 parent_id
+        proxyRegionDAO.batchSaveOrUpdate(proxyRegionList);
+        log.info("地域信息批量修改或插入完成，总共处理的地域记录数为 {} 条，第三方获取到的地域条数为 {}", batchModifiedCount, proxyRegionList.size());
+        return batchModifiedCount;
     }
 
     /**
@@ -168,7 +169,7 @@ public class RegionServiceImpl implements RegionService {
             String decryptedJson = apiPacketUtil.unpack(encryptedData);
             log.info("地域接口返回数据解密成功：{}", decryptedJson);
 
-            List<AreaDTO> areaList = objectMapper.readValue(decryptedJson, new TypeReference<>() {
+            List<AreaDTO> areaList = objectMapper.readValue(decryptedJson, new TypeReference<List<AreaDTO>>() {
             });
             return areaList != null ? areaList : Collections.emptyList();
         } else {
@@ -176,7 +177,9 @@ public class RegionServiceImpl implements RegionService {
         }
     }
 
-    private void flattenTree(List<AreaDTO> nodes, String parentCode, int level, List<String> codePath, List<String> cnamePath, List<Region> out, Map<String, String> regionCodeToParentCode) {
+    private void flattenTree(List<AreaDTO> nodes, String parentCode, int level, List<String> codePath,
+                             List<String> cnamePath, List<ProxyRegion> out, Map<String, String> regionCodeToParentCode,
+                             Set<String> seenCodes) {
         if (nodes == null || nodes.isEmpty()) {
             return;
         }
@@ -191,6 +194,14 @@ public class RegionServiceImpl implements RegionService {
             String cname = node.getCname();
             String nameEn = node.getName();
 
+            // 检测重复 regionCode，重复时打印到控制台
+            if (!seenCodes.add(regionCode)) {
+                System.out.println("[重复regionCode] code=" + regionCode
+                        + ", cname=" + cname
+                        + ", parentCode=" + parentCode
+                        + ", level=" + level);
+            }
+
             // 构建全路径（full_code/full_name）
             List<String> nextCodePath = new ArrayList<>(codePath);
             List<String> nextCnamePath = new ArrayList<>(cnamePath);
@@ -200,23 +211,23 @@ public class RegionServiceImpl implements RegionService {
             String fullCode = String.join("-", nextCodePath);
             String fullName = nextCnamePath.stream().filter(Objects::nonNull).collect(Collectors.joining("-"));
 
-            Region region = new Region();
-            region.setParentId(0L); // 后续在 upsert 后回填
-            region.setLevel(level);
-            region.setRegionCode(regionCode);
-            region.setRegionName(cname);
-            region.setRegionEnName(nameEn == null ? "" : nameEn);
-            region.setSort(i);
-            region.setFullCode(fullCode);
-            region.setFullName(fullName);
-            region.setStatus(1);
-            out.add(region);
+            ProxyRegion proxyRegion = new ProxyRegion();
+            proxyRegion.setParentId(0L); // 后续在 upsert 后回填
+            proxyRegion.setLevel(level);
+            proxyRegion.setRegionCode(regionCode);
+            proxyRegion.setRegionName(cname);
+            proxyRegion.setRegionEnName(nameEn == null ? "" : nameEn);
+            proxyRegion.setSort(i);
+            proxyRegion.setFullCode(fullCode);
+            proxyRegion.setFullName(fullName);
+            proxyRegion.setStatus(1);
+            out.add(proxyRegion);
 
             regionCodeToParentCode.put(regionCode, parentCode);
 
             // 递归子节点
-            flattenTree(node.getChildren(), regionCode, level + 1, nextCodePath, nextCnamePath, out, regionCodeToParentCode);
+            flattenTree(node.getChildren(), regionCode, level + 1, nextCodePath, nextCnamePath, out,
+                    regionCodeToParentCode, seenCodes);
         }
     }
 }
-

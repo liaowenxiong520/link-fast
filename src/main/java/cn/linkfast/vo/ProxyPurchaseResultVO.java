@@ -3,7 +3,7 @@ package cn.linkfast.vo;
 import lombok.Data;
 
 @Data
-public class ProxyOrderCreateVO {
+public class ProxyPurchaseResultVO {
     private String appOrderNo;
     private Integer status;
     private String orderNo;

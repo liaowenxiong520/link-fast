@@ -1,13 +1,13 @@
 package cn.linkfast.service;
 
-import cn.linkfast.vo.AreaDTO;
+import cn.linkfast.dto.AreaDTO;
 
 import java.util.List;
 
 /**
  * 地域同步服务
  */
-public interface RegionService {
+public interface ProxyRegionService {
 
     List<AreaDTO> queryRegionTree(List<String> codes);
 

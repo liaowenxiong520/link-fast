@@ -16,7 +16,7 @@ public class ProxyOrderVO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 订单号
+     * 平台订单号
      */
     private String orderNo;
 

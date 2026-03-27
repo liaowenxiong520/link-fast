@@ -11,7 +11,7 @@ import java.util.Date;
  */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Region {
+public class ProxyRegion {
     private Long id;
     private Long parentId;
     private Integer level;

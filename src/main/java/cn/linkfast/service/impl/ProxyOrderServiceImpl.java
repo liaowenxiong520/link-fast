@@ -3,21 +3,20 @@ package cn.linkfast.service.impl;
 import cn.linkfast.common.PageResult;
 import cn.linkfast.dao.ProxyOrderDAO;
 import cn.linkfast.dao.ProxyProductDAO;
-import cn.linkfast.dto.OrderUpdateResultDTO;
-import cn.linkfast.dto.ProxyOrderCreateDTO;
-import cn.linkfast.dto.ProxyOrderQueryDTO;
-import cn.linkfast.dto.ProxyOrderSearchCondition;
-import cn.linkfast.entity.ProxyInstance;
-import cn.linkfast.entity.ProxyOrder;
-import cn.linkfast.entity.ProxyOrderItem;
-import cn.linkfast.entity.ProxyProduct;
+import cn.linkfast.dto.*;
+import cn.linkfast.entity.*;
 import cn.linkfast.exception.BusinessException;
+import cn.linkfast.exception.NoRollbackBusinessException;
 import cn.linkfast.service.PayService;
 import cn.linkfast.service.ProxyOrderService;
+import cn.linkfast.service.ProxyProductService;
 import cn.linkfast.utils.ApiPacketUtil;
+import cn.linkfast.utils.AppOrderNoGenerator;
+import cn.linkfast.utils.HttpClientUtil;
 import cn.linkfast.vo.PayPasswordVO;
-import cn.linkfast.vo.ProxyOrderCreateVO;
 import cn.linkfast.vo.ProxyOrderVO;
+import cn.linkfast.vo.ProxyPurchaseResultVO;
+import cn.linkfast.vo.ProxyRenewResultVO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,22 +24,15 @@ import jakarta.annotation.PostConstruct;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
 
 @Slf4j
 @Service
@@ -52,6 +44,8 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     private final ApiPacketUtil apiPacketUtil;
     private final ProxyProductDAO proxyProductDAO;
     private final PayService payService;
+    private final AppOrderNoGenerator appOrderNoGenerator;
+    private final ProxyProductService proxyProductService;
     @Value("${api.ipv.env}")
     private String env;
     @Value("${api.ipv.sandbox_url}")
@@ -62,8 +56,9 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     private String orderQueryPath;
     @Value("${api.ipv.path.order_create}")
     private String orderOpenPath;
+    @Value("${api.ipv.path.instance_renew}")
+    private String instanceRenewPath;
     private String baseUrl; // 动态确定的基础地址
-
 
     private static @NonNull ProxyOrderSearchCondition buildSearchCondition(@NonNull ProxyOrderQueryDTO queryDto) {
         ProxyOrderSearchCondition condition = new ProxyOrderSearchCondition();
@@ -94,8 +89,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public OrderUpdateResultDTO syncOrderDetails(Map<String, Object> params) throws Exception {
-
+    public ProxyOrderUpdateResultDTO syncOrderDetails(Map<String, Object> params) throws Exception {
 
         // 拼接完整的请求 URL
         String fullUrl = baseUrl + orderQueryPath;
@@ -108,7 +102,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         String responseStr = sendPost(fullUrl, finalRequest);
 
         ProxyOrder order = processResponse(responseStr);
-        if (order == null) return new OrderUpdateResultDTO();
+        if (order == null) return new ProxyOrderUpdateResultDTO();
 
         // 将订单的 appOrderNo 赋值给每个实例，确保实例表也关联渠道商订单号
         if (order.getInstances() != null && order.getAppOrderNo() != null) {
@@ -119,9 +113,14 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             }
         }
 
-        // 通过 appOrderNo 查询本地订单，获取 userId 赋值给每个实例
         if (order.getInstances() != null && !order.getInstances().isEmpty()) {
+            // 通过appOrderNo获取本地代理订单
             ProxyOrder localOrder = proxyOrderDAO.selectByAppOrderNo(order.getAppOrderNo());
+            // 获取代理订单id，赋值给每个实例
+            for (ProxyInstance instance : order.getInstances()) {
+                instance.setOrderId(localOrder.getId());
+            }
+            // 获取 userId 赋值给每个实例
             if (localOrder != null && localOrder.getUserId() != null) {
                 for (ProxyInstance instance : order.getInstances()) {
                     instance.setUserId(localOrder.getUserId());
@@ -129,11 +128,11 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             }
         }
 
-        return proxyOrderDAO.updateByAppOrderNo(order);
+        return proxyOrderDAO.updateProxyPurchaseOrderByAppOrderNo(order);
     }
 
     @Override
-    public PageResult<ProxyOrderVO> queryProxyOrders(ProxyOrderQueryDTO dto) {
+    public PageResult<ProxyOrderVO> queryOrders(ProxyOrderQueryDTO dto) {
         // 1. DTO转换为DAO查询条件
         ProxyOrderSearchCondition condition = buildSearchCondition(dto);
 
@@ -160,15 +159,18 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         return vo;
     }
 
+    /**
+     * 委托 {@link HttpClientUtil#sendPost}，保留为 public 便于集成测试 Spy 拦截网络调用。
+     */
     public String sendPost(String url, Map<String, Object> body) throws Exception {
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpPost post = new HttpPost(url);
-            post.setEntity(new StringEntity(objectMapper.writeValueAsString(body), ContentType.APPLICATION_JSON));
-            return client.execute(post, response -> EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8));
-        }
+        return HttpClientUtil.sendPost(url, body, objectMapper);
     }
 
     private ProxyOrder processResponse(String responseStr) throws Exception {
+        if (responseStr == null || responseStr.isEmpty()) {
+            log.error("第三方API响应为空");
+            throw new RuntimeException("第三方API响应为空");
+        }
         log.info("第三方API原始响应: {}", responseStr);
         JsonNode root = objectMapper.readTree(responseStr);
         if (root.path("code").asInt() == 200) {
@@ -188,27 +190,70 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public ProxyOrderCreateVO createProxyOrder(ProxyOrderCreateDTO dto) {
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = NoRollbackBusinessException.class)
+    public ProxyPurchaseResultVO purchaseProxies(ProxyPurchaseDTO dto) {
         // 1. 校验支付密码
         PayPasswordVO payResult = payService.verifyPayPassword(dto.getPayPassword());
         if (!payResult.getPassed()) {
             throw new BusinessException(400, payResult.getMessage());
         }
 
+        // 判断代理产品库存是否足够
+        for (ProxyPurchaseItemDTO itemDto : dto.getParams()) {
+            String productNo = itemDto.getProductNo();
+            // 构建业务参数
+            Map<String, Object> stockParams = new java.util.HashMap<>();
+            stockParams.put("productNo", productNo);
+            stockParams.put("proxyType", java.util.Arrays.asList(101, 102, 103, 104, 105, 201));
+            List<ProxyProduct> products;
+            try {
+                products = proxyProductService.getProxyProducts(stockParams);
+            } catch (Exception e) {
+                log.error("查询产品库存失败，productNo: {}", productNo, e);
+                throw new BusinessException("查询产品库存失败，请稍后重试");
+            }
+            if (products == null || products.isEmpty()) {
+                throw new BusinessException(400, "产品不存在或已下架，productNo: " + productNo);
+            }
+            ProxyProduct product = products.get(0);
+            Integer inventory = product.getInventory();
+            Integer count = itemDto.getCount();
+            if (inventory == null || inventory < count) {
+                throw new BusinessException(400, "产品库存不足，productNo: " + productNo + "，当前库存: " + (inventory == null ? 0 : inventory) + "，需要数量: " + count);
+            }
+            // 库存充足，异步更新数据库产品信息，不阻塞当前下单线程
+            final List<ProxyProduct> finalProducts = products;
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    proxyProductDAO.batchSaveOrUpdate(finalProducts);
+                } catch (Exception e) {
+                    log.error("异步更新产品信息失败，productNo: {}", productNo, e);
+                }
+            });
+        }
+
         /*
-          userId 目前没有传入参数，暂时写死一个值，后续可以通过鉴权上下文获取当前用户ID，或者在DTO中添加userId字段由调用方传入
+         * userId 目前没有传入参数，暂时写死一个值，后续可以通过鉴权上下文获取当前用户ID，或者在DTO中添加userId字段由调用方传入
          */
         Long userId = 2032958739262217115L;
-        String appOrderNo = userId + "" + System.currentTimeMillis();
+        String appOrderNo = appOrderNoGenerator.generateBuyOrderId();
+        log.info("成功生成appOrderNo，编号为：{}", appOrderNo);
         ProxyOrder order = new ProxyOrder();
         order.setAppOrderNo(appOrderNo);
         order.setUserId(userId);
-        order.setOrderType(dto.getOrderType());
+        // 购买代理的订单类型就是1
+        order.setOrderType(1);
+        // 订单的初始状态就是1，表示待处理
+        order.setStatus(1);
         order.setTotalQuantity(dto.getTotalQuantity());
-        order.setStatus(1); // 待处理
-        List<ProxyOrderItem> items = dto.getParams().stream().map(itemDto -> {
-            ProxyOrderItem item = new ProxyOrderItem();
+        order.setHasRefund(0);
+        // 先存储主订单数据
+        Long orderId = proxyOrderDAO.insertOrder(order);
+        List<ProxyPurchaseOrderItem> items = dto.getParams().stream().map(itemDto -> {
+            ProxyPurchaseOrderItem item = new ProxyPurchaseOrderItem();
+            // 订单明细需要存储代理购买订单的id
+            item.setOrderId(orderId);
+            // 订单明细需要存储代理购买订单的渠道商订单号
             item.setAppOrderNo(appOrderNo);
             item.setProductNo(itemDto.getProductNo());
             item.setProxyType(itemDto.getProxyType());
@@ -221,7 +266,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             item.setCycleTimes(itemDto.getCycleTimes());
             item.setFlow(0);
             item.setUseBridge(1);
-//            item.setProjectId(itemDto.getProjectId());
+            // item.setProjectId(itemDto.getProjectId());
 
             // 查库补全其它属性
             if (itemDto.getProductNo() != null) {
@@ -257,56 +302,150 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
             }
             return item;
         }).collect(Collectors.toList());
-        order.setItems(items);
-        proxyOrderDAO.insert(order);
+        order.setPurchaseItems(items);
+        // 再存储订单明细数据
+        proxyOrderDAO.insertProxyPurchaseOrderItems(order);
         String orderNo = null;
-        java.math.BigDecimal amount = null;
-        try {
-            Map<String, Object> bizParams = new java.util.HashMap<>();
-            bizParams.put("appOrderNo", appOrderNo);
-            List<Map<String, Object>> paramList = new java.util.ArrayList<>();
-            for (ProxyOrderItem item : items) {
-                Map<String, Object> m = new java.util.HashMap<>();
-                m.put("productNo", item.getProductNo());
-                m.put("proxyType", item.getProxyType());
-                m.put("countryCode", item.getCountryCode());
-                m.put("stateCode", item.getStateCode());
-                m.put("cityCode", item.getCityCode());
-                m.put("unit", item.getUnit());
-                m.put("duration", item.getDuration());
-                m.put("count", item.getCount());
-                m.put("cycleTimes", item.getCycleTimes());
-                m.put("flow", item.getFlow());
-                m.put("useBridge", item.getUseBridge());
-                if (item.getProjectId() != null) {
-                    m.put("projectId", item.getProjectId());
-                }
-                paramList.add(m);
+        BigDecimal amount = null;
+
+        // 构建第三方API业务参数
+        Map<String, Object> bizParams = new java.util.HashMap<>();
+        bizParams.put("appOrderNo", appOrderNo);
+        List<Map<String, Object>> paramList = new java.util.ArrayList<>();
+        for (ProxyPurchaseOrderItem item : items) {
+            Map<String, Object> m = new java.util.HashMap<>();
+            m.put("productNo", item.getProductNo());
+            m.put("proxyType", item.getProxyType());
+            m.put("countryCode", item.getCountryCode());
+            m.put("stateCode", item.getStateCode());
+            m.put("cityCode", item.getCityCode());
+            m.put("unit", item.getUnit());
+            m.put("duration", item.getDuration());
+            m.put("count", item.getCount());
+            m.put("cycleTimes", item.getCycleTimes());
+            m.put("flow", item.getFlow());
+            m.put("useBridge", item.getUseBridge());
+            if (item.getProjectId() != null) {
+                m.put("projectId", item.getProjectId());
             }
-            bizParams.put("params", paramList);
+            paramList.add(m);
+        }
+        bizParams.put("params", paramList);
+        try {
             Map<String, Object> req = apiPacketUtil.pack(bizParams);
             String url = baseUrl + orderOpenPath;
-            String resp = sendPost(url, req);
-            ProxyOrder respOrder = processResponse(resp);
-            if (respOrder != null) {
-                orderNo = respOrder.getOrderNo();
-                amount = respOrder.getAmount();
-                OrderUpdateResultDTO updateResult = proxyOrderDAO.updateByAppOrderNo(appOrderNo, orderNo, amount);
-                // 校验主订单更新行数，预期更新 1 条
-                if (updateResult.getProxyOrderUpdatedRows() != 1) {
-                    throw new BusinessException("回写订单失败，主订单预期更新1条，实际更新" + updateResult.getProxyOrderUpdatedRows() + "条，appOrderNo=" + appOrderNo);
-                }
-                // 校验子订单更新行数
-                int expectSubCount = order.getItems().size();
-                int actualSubCount = updateResult.getProxyOrderItemUpdatedRows();
-                if (actualSubCount != expectSubCount) {
-                    throw new BusinessException("子订单更新异常！预期更新" + expectSubCount + "条，实际更新" + actualSubCount + "条，触发事务回滚");
+            log.info("开通代理 - 请求URL: {}, 请求参数: {}", url, objectMapper.writeValueAsString(req));
+
+            // ===== 场景1：请求第三方接口失败，对方系统没有收到请求，重试3次，仍失败则回滚 =====
+            String resp = null;
+            Exception sendException = null;
+            for (int attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    resp = HttpClientUtil.sendPost(url, req, objectMapper);
+                    sendException = null;
+                    break;
+                } catch (java.net.ConnectException | java.net.UnknownHostException e) {
+                    // 连接建立失败：对方系统完全没有收到请求，可以安全重试
+                    sendException = e;
+                    log.warn("开通代理 - 第{}次请求连接失败: {}", attempt, e.getMessage());
+                    if (attempt < 3) {
+                        try {
+                            Thread.sleep(1000L * attempt);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                } catch (Exception e) {
+                    // ===== 场景3：连接已建立，请求已发送到对方，但响应读取失败 =====
+                    // 对方可能已落库，不可回滚，保留本地数据
+                    log.error("开通代理 - 请求已发送但响应读取失败，对方可能已落库，保留本地数据，appOrderNo: {}", appOrderNo, e);
+                    throw new NoRollbackBusinessException("开通代理请求已发送，但响应读取异常，请联系管理员确认订单结果，appOrderNo: " + appOrderNo, e);
                 }
             }
+            // 场景1：重试3次仍连接失败，可安全回滚
+            if (sendException != null) {
+                log.error("开通代理 - 重试3次后仍连接失败，回滚本地数据，appOrderNo: {}", appOrderNo, sendException);
+                throw new BusinessException("开通代理请求失败，请稍后重试", sendException);
+            }
+
+            log.info("开通代理 - 响应: {}", resp);
+
+            // ===== 场景4：sendPost返回空字符串，对方可能已落库，不可回滚 =====
+            if (resp == null || resp.isEmpty()) {
+                log.error("开通代理 - 响应为空，对方可能已落库，保留本地数据，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("开通代理响应为空，请联系管理员确认订单结果，appOrderNo: " + appOrderNo);
+            }
+
+            // 解析外层响应 JSON
+            JsonNode root;
+            try {
+                root = objectMapper.readTree(resp);
+            } catch (Exception e) {
+                // 响应不是合法JSON，对方可能已落库，不可回滚
+                log.error("开通代理 - 响应非法JSON，对方可能已落库，保留本地数据，appOrderNo: {}, resp: {}", appOrderNo, resp, e);
+                throw new NoRollbackBusinessException("开通代理响应格式异常，请联系管理员确认订单结果，appOrderNo: " + appOrderNo, e);
+            }
+
+            // ===== 场景2/5：对方返回非200，业务处理失败，对方未落库，可回滚 =====
+            int respCode = root.path("code").asInt(-1);
+            if (respCode != 200) {
+                String msg = root.path("msg").asText("");
+                log.error("开通代理 - 对方返回业务失败, code={}, msg={}, appOrderNo: {}", respCode, msg, appOrderNo);
+                throw new BusinessException("开通代理失败: " + msg);
+            }
+
+            // ===== 场景6：code=200，data节点缺失/null/空字符串，对方已落库，不可回滚 =====
+            JsonNode dataJsonNode = root.path("data");
+            if (dataJsonNode.isMissingNode() || dataJsonNode.isNull()) {
+                log.error("开通代理 - code=200 但data节点缺失或为null，对方已落库，保留本地数据，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("开通代理响应data缺失，请联系管理员确认订单结果，appOrderNo: " + appOrderNo);
+            }
+            String encryptedData = dataJsonNode.asText();
+            if (encryptedData.isEmpty()) {
+                log.error("开通代理 - code=200 但data为空字符串，对方已落库，保留本地数据，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("开通代理响应data为空，请联系管理员确认订单结果，appOrderNo: " + appOrderNo);
+            }
+
+            // ===== 场景7：解密失败，对方已落库，不可回滚 =====
+            String decryptedJson;
+            try {
+                decryptedJson = apiPacketUtil.unpack(encryptedData);
+            } catch (Exception e) {
+                log.error("开通代理 - 解密失败，对方已落库，保留本地数据，appOrderNo: {}", appOrderNo, e);
+                throw new NoRollbackBusinessException("开通代理响应解密失败，请联系管理员确认订单结果，appOrderNo: " + appOrderNo, e);
+            }
+            log.info("开通代理接口返回数据解密成功: {}", decryptedJson);
+
+            // ===== 场景8：解密成功，但JSON非法或orderNo/amount为空，对方已落库，不可回滚 =====
+            try {
+                JsonNode dataNode = objectMapper.readTree(decryptedJson);
+                JsonNode orderNoNode = dataNode.path("orderNo");
+                if (orderNoNode.isMissingNode() || orderNoNode.isNull() || orderNoNode.asText().isEmpty()) {
+                    throw new IllegalStateException("未获取到orderNo");
+                }
+                orderNo = orderNoNode.asText();
+                JsonNode amountNode = dataNode.path("amount");
+                if (!amountNode.isMissingNode() && !amountNode.isNull() && !amountNode.asText().isEmpty()) {
+                    amount = new java.math.BigDecimal(amountNode.asText());
+                }
+            } catch (Exception e) {
+                log.error("开通代理 - 解密后数据解析失败或orderNo为空，对方已落库，保留本地数据，appOrderNo: {}, decryptedJson: {}", appOrderNo, decryptedJson, e);
+                throw new NoRollbackBusinessException("开通代理响应数据解析失败，请联系管理员确认订单结果，appOrderNo: " + appOrderNo, e);
+            }
+
+            // 回写订单信息
+            proxyOrderDAO.updateProxyPurchaseOrderByAppOrderNo(appOrderNo, orderNo, amount);
+        } catch (NoRollbackBusinessException e) {
+            // 对方已落库场景：不回滚本地数据，直接透传
+            throw e;
+        } catch (BusinessException e) {
+            // 可回滚场景：@Transactional 自动回滚
+            throw e;
         } catch (Exception e) {
+            // 兜底：未预期异常，回滚数据
             throw new BusinessException("订单创建失败，请稍后重试", e);
         }
-        ProxyOrderCreateVO vo = new ProxyOrderCreateVO();
+        ProxyPurchaseResultVO vo = new ProxyPurchaseResultVO();
         vo.setAppOrderNo(appOrderNo);
         vo.setStatus(1); // 待处理
         vo.setOrderNo(orderNo);
@@ -315,7 +454,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     }
 
     @Override
-    public ProxyOrderVO getProxyOrderByAppOrderNo(String appOrderNo) {
+    public ProxyOrderVO getOrderByAppOrderNo(String appOrderNo) {
         ProxyOrder order = proxyOrderDAO.selectByAppOrderNo(appOrderNo);
         if (order == null) {
             return null;
@@ -323,6 +462,203 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         return convertToVO(order);
     }
 
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = NoRollbackBusinessException.class)
+    public ProxyRenewResultVO renewProxies(List<ProxyRenewItemDTO> items) {
+        Long userId = 2032958739262217115L;
+        String appOrderNo = appOrderNoGenerator.generateRenewOrderId();
+        log.info("成功生成appOrderNo，编号为：{}", appOrderNo);
+        ProxyOrder order = new ProxyOrder();
+        order.setAppOrderNo(appOrderNo);
+        order.setUserId(userId);
+        // 续费代理的订单类型就是2
+        order.setOrderType(2);
+        order.setStatus(1);
+        order.setHasRefund(0);
+        order.setTotalQuantity(items.size());
+        order.setInstanceTotal(items.size());
+
+        // 先存储主订单数据
+        Long orderId = proxyOrderDAO.insertOrder(order);
+        List<ProxyRenewOrderItem> orderItems = items.stream().map(itemDto -> {
+            ProxyRenewOrderItem item = new ProxyRenewOrderItem();
+            // 订单明细需要存储代理续费订单的id
+            item.setOrderId(orderId);
+            // 订单明细需要存储代理续费订单的渠道商订单号
+            item.setAppOrderNo(appOrderNo);
+            item.setInstanceNo(itemDto.getInstanceNo());
+            item.setDuration(itemDto.getDuration());
+            item.setUnit(itemDto.getUnit());
+            item.setCycleTimes(itemDto.getCycleTimes());
+            return item;
+        }).collect(Collectors.toList());
+        order.setRenewItems(orderItems);
+        // 再存储订单明细数据
+        proxyOrderDAO.insertProxyRenewOrderItems(order);
+
+        // 构建第三方API业务参数
+        Map<String, Object> bizParams = new java.util.HashMap<>();
+        bizParams.put("appOrderNo", appOrderNo);
+        List<Map<String, Object>> instanceList = new java.util.ArrayList<>();
+        for (ProxyRenewItemDTO renewItem : items) {
+            Map<String, Object> instMap = new java.util.HashMap<>();
+            instMap.put("instanceNo", renewItem.getInstanceNo());
+            instMap.put("duration", renewItem.getDuration());
+
+            // // 根据 duration 和 unit 计算 cycleTimes
+            // int cycleTimes;
+            // Integer duration = inst.getDuration();
+            // Integer unit = inst.getUnit();
+            // Integer renewMonths = inst.getRenewMonths() != null ? inst.getRenewMonths() :
+            // 1;
+            //
+            // if (duration != null && duration == 1 && unit != null && unit == 1) {
+            // // duration=1, unit=1（天）：月数转天数，1个月=30天
+            // cycleTimes = renewMonths * 30;
+            // } else if (duration != null && duration == 1 && unit != null && unit == 3) {
+            // // duration=1, unit=3（月）：cycleTimes=月数
+            // cycleTimes = renewMonths;
+            // } else if (duration != null && duration == 30 && unit != null && unit == 1) {
+            // // duration=30, unit=1（天，即30天/月）：cycleTimes=月数
+            // cycleTimes = renewMonths;
+            // } else if (duration != null && duration == 1 && unit != null && unit == 4) {
+            // // duration=1, unit=4（年）：仅支持12个月，cycleTimes=1
+            // cycleTimes = 1;
+            // } else {
+            // // 默认情况
+            // cycleTimes = renewMonths;
+            // }
+            instMap.put("cycleTimes", renewItem.getCycleTimes());
+            instanceList.add(instMap);
+        }
+        bizParams.put("instances", instanceList);
+
+        try {
+            // 加密打包请求参数
+            Map<String, Object> req = apiPacketUtil.pack(bizParams);
+            String url = baseUrl + instanceRenewPath;
+            log.info("续费代理 - 请求URL: {}, 请求参数: {}", url, objectMapper.writeValueAsString(req));
+
+            // ===== 场景1：请求第三方接口失败，对方系统没有收到请求，重试3次，仍失败则回滚 =====
+            String resp = null;
+            Exception sendException = null;
+            for (int attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    resp = HttpClientUtil.sendPost(url, req, objectMapper);
+                    sendException = null;
+                    break;
+                } catch (java.net.ConnectException | java.net.UnknownHostException e) {
+                    // 连接建立失败：对方系统完全没有收到请求，可以安全重试
+                    sendException = e;
+                    log.warn("续费代理 - 第{}次请求连接失败: {}", attempt, e.getMessage());
+                    if (attempt < 3) {
+                        try {
+                            Thread.sleep(1000L * attempt);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                } catch (Exception e) {
+                    // ===== 场景3：连接已建立，请求已发送到对方，但响应读取失败 =====
+                    // 对方可能已落库，不可回滚，保留本地数据
+                    log.error("续费代理 - 请求已发送但响应读取失败，对方可能已落库，保留本地数据，appOrderNo: {}", appOrderNo, e);
+                    throw new NoRollbackBusinessException("续费代理请求已发送，但响应读取异常，请联系管理员确认续费结果，appOrderNo: " + appOrderNo, e);
+                }
+            }
+            // 场景1：重试3次仍连接失败，可安全回滚
+            if (sendException != null) {
+                log.error("续费代理 - 重试3次后仍连接失败，回滚本地数据，appOrderNo: {}", appOrderNo, sendException);
+                throw new BusinessException("续费代理请求失败，请稍后重试", sendException);
+            }
+
+            log.info("续费代理 - 响应: {}", resp);
+
+            // ===== 场景4：sendPost返回空字符串，对方可能已落库，不可回滚 =====
+            if (resp == null || resp.isEmpty()) {
+                log.error("续费代理 - 响应为空，对方可能已落库，保留本地数据，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("续费代理响应为空，请联系管理员确认续费结果，appOrderNo: " + appOrderNo);
+            }
+
+            // 解析外层响应 JSON
+            JsonNode root;
+            try {
+                root = objectMapper.readTree(resp);
+            } catch (Exception e) {
+                // 响应不是合法JSON，对方可能已落库，不可回滚
+                log.error("续费代理 - 响应非法JSON，对方可能已落库，保留本地数据，appOrderNo: {}, resp: {}", appOrderNo, resp, e);
+                throw new NoRollbackBusinessException("续费代理响应格式异常，请联系管理员确认续费结果，appOrderNo: " + appOrderNo, e);
+            }
+
+            // ===== 场景2：对方返回非200，业务处理失败，对方未落库，可回滚 =====
+            int respCode = root.path("code").asInt(-1);
+            if (respCode != 200) {
+                String msg = root.path("msg").asText("");
+                log.error("续费代理 - 对方返回业务失败, code={}, msg={}, appOrderNo: {}", respCode, msg, appOrderNo);
+                throw new BusinessException("续费失败: " + msg);
+            }
+
+            // ===== 场景6：code=200，data节点缺失/null/空字符串，对方已落库，不可回滚 =====
+            JsonNode dataJsonNode = root.path("data");
+            if (dataJsonNode.isMissingNode() || dataJsonNode.isNull()) {
+                log.error("续费代理 - code=200 但data节点缺失或为null，对方已落库，保留本地数据，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("续费代理响应data缺失，请联系管理员确认续费结果，appOrderNo: " + appOrderNo);
+            }
+            String encryptedData = dataJsonNode.asText();
+            if (encryptedData.isEmpty()) {
+                log.error("续费代理 - code=200 但data为空字符串，对方已落库，保留本地数据，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("续费代理响应data为空，请联系管理员确认续费结果，appOrderNo: " + appOrderNo);
+            }
+
+            // ===== 场景7：解密失败，对方已落库，不可回滚 =====
+            String decryptedJson;
+            try {
+                decryptedJson = apiPacketUtil.unpack(encryptedData);
+            } catch (Exception e) {
+                log.error("续费代理 - 解密失败，对方已落库，保留本地数据，appOrderNo: {}", appOrderNo, e);
+                throw new NoRollbackBusinessException("续费代理响应解密失败，请联系管理员确认续费结果，appOrderNo: " + appOrderNo, e);
+            }
+            log.info("续费代理接口返回数据解密成功: {}", decryptedJson);
+
+            // ===== 场景8：解密成功，但JSON非法或orderNo为空，对方已落库，不可回滚 =====
+            String orderNo;
+            java.math.BigDecimal amount;
+            try {
+                JsonNode renewDataNode = objectMapper.readTree(decryptedJson);
+                JsonNode orderNoNode = renewDataNode.path("orderNo");
+                if (orderNoNode.isMissingNode() || orderNoNode.isNull() || orderNoNode.asText().isEmpty()) {
+                    throw new IllegalStateException("未获取到orderNo");
+                } else {
+                    orderNo = orderNoNode.asText();
+                }
+                JsonNode amountNode = renewDataNode.path("amount");
+                if (amountNode.isMissingNode() || amountNode.isNull() || amountNode.asText().isEmpty()) {
+                    throw new IllegalStateException("未获取到amount");
+                } else {
+                    amount = new java.math.BigDecimal(amountNode.asText());
+                }
+            } catch (Exception e) {
+                log.error("续费代理 - 解密后数据解析失败或orderNo为空，对方已落库，保留本地数据，appOrderNo: {}, decryptedJson: {}", appOrderNo, decryptedJson, e);
+                throw new NoRollbackBusinessException("续费代理响应数据解析失败，请联系管理员确认续费结果，appOrderNo: " + appOrderNo, e);
+            }
+
+            // 更新主订单信息
+            proxyOrderDAO.updateProxyRenewOrderByAppOrderNo(appOrderNo, orderNo, amount);
+            // 构建返回VO
+            ProxyRenewResultVO vo = new ProxyRenewResultVO();
+            vo.setOrderNo(orderNo);
+            vo.setAppOrderNo(appOrderNo);
+            vo.setAmount(amount);
+            vo.setStatus(1);
+            return vo;
+        } catch (NoRollbackBusinessException e) {
+            // 对方已落库场景：不回滚本地数据，直接透传给Controller
+            throw e;
+        } catch (BusinessException e) {
+            // 可回滚场景：@Transactional自动回滚
+            throw e;
+        } catch (Exception e) {
+            // 兜底：未预期异常，回滚数据
+            throw new BusinessException("续费代理失败，请稍后重试", e);
+        }
+    }
+
 }
-
-

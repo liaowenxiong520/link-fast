@@ -32,5 +32,7 @@ public class ProxyInstanceController {
         PageResult<ProxyInstanceVO> pageResult = proxyInstanceService.queryProxyInstances(queryDto);
         return Result.success(pageResult);
     }
+
+
 }
 

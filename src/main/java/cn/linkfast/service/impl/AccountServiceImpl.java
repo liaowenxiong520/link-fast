@@ -3,22 +3,16 @@ package cn.linkfast.service.impl;
 import cn.linkfast.entity.AppAccountInfo;
 import cn.linkfast.service.AccountService;
 import cn.linkfast.utils.ApiPacketUtil;
+import cn.linkfast.utils.HttpClientUtil;
 import cn.linkfast.vo.AccountInfoVO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 @Slf4j
@@ -53,7 +47,7 @@ public class AccountServiceImpl implements AccountService {
         try {
             Map<String, Object> finalRequest = apiPacketUtil.pack(null);
             String fullUrl = baseUrl + appInfoPath;
-            String responseStr = sendPost(fullUrl, finalRequest);
+            String responseStr = HttpClientUtil.sendPost(fullUrl, finalRequest, objectMapper);
 
             AppAccountInfo appAccountInfo = processResponse(responseStr);
             if (appAccountInfo == null) {
@@ -68,27 +62,6 @@ public class AccountServiceImpl implements AccountService {
             return null;
         }
     }
-
-    /**
-     * 发送 POST 请求
-     */
-    private String sendPost(String url, Map<String, Object> body) throws Exception {
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpPost post = new HttpPost(url);
-            String json = objectMapper.writeValueAsString(body);
-            post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
-            return client.execute(post, response -> {
-                int status = response.getCode();
-                if (status >= 200 && status < 300) {
-                    return EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
-                } else {
-                    log.error("HTTP 请求失败，状态码: {}", status);
-                    return "{\"code\":" + status + ", \"msg\":\"HTTP Error\"}";
-                }
-            });
-        }
-    }
-
 
     private AppAccountInfo processResponse(String responseStr) throws Exception {
         JsonNode root = objectMapper.readTree(responseStr);

@@ -2,8 +2,10 @@ package cn.linkfast.service;
 
 import cn.linkfast.common.PageResult;
 import cn.linkfast.dto.ProxyProductQueryDTO; // 对应修改为 ProxyProductQueryDTO
+import cn.linkfast.entity.ProxyProduct;
 import cn.linkfast.vo.ProxyProductVO;      // 对应修改为 ProxyProductVO
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -11,6 +13,8 @@ import java.util.Map;
  * 采用 DTO 入参和 VO 出参，确保接口协议与数据库模型解耦
  */
 public interface ProxyProductService {
+
+    List<ProxyProduct> getProxyProducts(Map<String, Object> params) throws Exception;
 
     /**
      * 从第三方同步代理产品数据到我方数据库

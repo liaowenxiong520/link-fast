@@ -2,11 +2,14 @@ package cn.linkfast.service.impl;
 
 import cn.linkfast.common.PageResult;
 import cn.linkfast.dao.ProxyInstanceDAO;
+import cn.linkfast.dao.ProxyRegionDAO;
 import cn.linkfast.dto.ProxyInstanceQueryDTO;
 import cn.linkfast.dto.ProxyInstanceSearchCondition;
 import cn.linkfast.entity.ProxyInstance;
+import cn.linkfast.entity.ProxyRegion;
 import cn.linkfast.service.ProxyInstanceService;
 import cn.linkfast.utils.ApiPacketUtil;
+import cn.linkfast.utils.HttpClientUtil;
 import cn.linkfast.vo.ProxyInstanceVO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,17 +17,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +39,7 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
 
     private final ObjectMapper objectMapper;
     private final ProxyInstanceDAO proxyInstanceDAO;
+    private final ProxyRegionDAO proxyRegionDAO;
     private final ApiPacketUtil apiPacketUtil;
 
     @Value("${api.ipv.env}")
@@ -84,7 +81,7 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
         Map<String, Object> finalRequest = apiPacketUtil.pack(params);
 
         // 4. 发送 HTTP 请求
-        String responseStr = sendPost(fullUrl, finalRequest);
+        String responseStr = HttpClientUtil.sendPost(fullUrl, finalRequest, objectMapper);
 
         // 5. 解析响应并持久化
         return processResponse(responseStr);
@@ -130,6 +127,24 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
     private ProxyInstanceVO convertToVO(ProxyInstance entity) {
         ProxyInstanceVO vo = new ProxyInstanceVO();
         BeanUtils.copyProperties(entity, vo);
+
+        // 拼接地域中文名：国家-城市（有值则拼，无则跳过）
+        StringBuilder regionName = new StringBuilder();
+        if (entity.getCountryCode() != null && !entity.getCountryCode().isEmpty()) {
+            ProxyRegion country = proxyRegionDAO.selectByRegionCode(entity.getCountryCode());
+            regionName.append(country != null ? country.getRegionName() : entity.getCountryCode());
+        }
+        if (entity.getCityCode() != null && !entity.getCityCode().isEmpty()) {
+            ProxyRegion city = proxyRegionDAO.selectByRegionCode(entity.getCityCode());
+            String cityName = city != null ? city.getRegionName() : entity.getCityCode();
+            if (!regionName.isEmpty()) {
+                regionName.append("-");
+            }
+            regionName.append(cityName);
+        }
+        if (!regionName.isEmpty()) {
+            vo.setRegionName(regionName.toString());
+        }
         return vo;
     }
 
@@ -166,24 +181,5 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
         }
     }
 
-    /**
-     * 发送 POST 请求
-     */
-    private String sendPost(String url, Map<String, Object> body) throws Exception {
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            HttpPost post = new HttpPost(url);
-            String json = objectMapper.writeValueAsString(body);
-            post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
-            return client.execute(post, response -> {
-                int status = response.getCode();
-                if (status >= 200 && status < 300) {
-                    return EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
-                } else {
-                    log.error("HTTP 请求失败，状态码: {}", status);
-                    return "{\"code\":" + status + ", \"msg\":\"HTTP Error\"}";
-                }
-            });
-        }
-    }
 }
 

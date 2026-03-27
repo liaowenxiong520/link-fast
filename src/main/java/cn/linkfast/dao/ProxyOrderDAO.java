@@ -1,9 +1,11 @@
 package cn.linkfast.dao;
 
-import cn.linkfast.dto.OrderUpdateResultDTO;
+import cn.linkfast.dto.ProxyOrderUpdateResultDTO;
+import cn.linkfast.dto.ProxyPurchaseOrderUpdateResultDTO;
 import cn.linkfast.dto.ProxyOrderSearchCondition;
 import cn.linkfast.entity.ProxyOrder;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface ProxyOrderDAO {
@@ -12,7 +14,7 @@ public interface ProxyOrderDAO {
      *
      * @param order 包含实例列表的订单对象
      */
-    OrderUpdateResultDTO updateByAppOrderNo(ProxyOrder order);
+    ProxyOrderUpdateResultDTO updateProxyPurchaseOrderByAppOrderNo(ProxyOrder order);
 
     /**
      * 分页查询订单列表
@@ -33,16 +35,18 @@ public interface ProxyOrderDAO {
     /**
      * 回写第三方返回的 orderNo 和 amount（同时更新 proxy_order 和 proxy_order_item）
      */
-    OrderUpdateResultDTO updateByAppOrderNo(String appOrderNo, String orderNo, java.math.BigDecimal amount);
+    ProxyOrderUpdateResultDTO updateProxyPurchaseOrderByAppOrderNo(String appOrderNo, String orderNo, java.math.BigDecimal amount);
+
+    ProxyOrderUpdateResultDTO updateProxyRenewOrderByAppOrderNo(String appOrderNo, String orderNo, BigDecimal amount);
 
     /**
      * 保存订单主数据和项目数据到数据库
      * 用于开通代理等新建订单场景
      *
-     * @param order 包含主表信息和 items 列表的订单对象
+     * @param order 包含主表信息和 purchaseItems 列表的订单对象
      * @return 保存的订单的 appOrderNo
      */
-    String insert(ProxyOrder order);
+    String insertOrderWithItems(ProxyOrder order);
 
     /**
      * 根据渠道商订单号查询单个订单
@@ -51,4 +55,28 @@ public interface ProxyOrderDAO {
      * @return 订单实体，不存在则返回 null
      */
     ProxyOrder selectByAppOrderNo(String appOrderNo);
+
+    /**
+     * 仅将主订单数据插入 proxy_order 表
+     *
+     * @param order 主订单对象
+     * @return 数据库自增生成的主键 id
+     */
+    Long insertOrder(ProxyOrder order);
+
+    /**
+     * 将 ProxyOrder 中的 purchaseItems 批量插入 proxy_purchase_order_item 表
+     *
+     * @param order 包含 purchaseItems 的订单对象
+     * @return 实际插入的行数
+     */
+    int insertProxyPurchaseOrderItems(ProxyOrder order);
+
+    /**
+     * 将 ProxyOrder 中的 renewItems 批量插入 proxy_renew_order_item 表
+     *
+     * @param order 包含 renewItems 的订单对象
+     * @return 实际插入的行数
+     */
+    int insertProxyRenewOrderItems(ProxyOrder order);
 }

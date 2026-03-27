@@ -1,5 +1,7 @@
 package cn.linkfast.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
 
 import jakarta.validation.constraints.NotNull;
@@ -20,31 +22,36 @@ public class ProxyOrderQueryDTO implements Serializable {
 
 
     /**
-     * 订单状态（必传）
+     * 订单状态
      */
-    @NotNull(message = "订单状态status不能为空")
     private Integer status;
 
     /**
      * 页码（必传）
      */
     @NotNull(message = "页码pageNum不能为空")
+    @Min(value = 1, message = "页码pageNum必须大于0")
     private Integer pageNum;
 
     /**
      * 每页条数（必传）
      */
     @NotNull(message = "每页条数pageSize不能为空")
+    @Min(value = 1, message = "每页条数pageSize必须大于0")
+    @Max(value = 100, message = "每页条数pageSize不能超过100")
     private Integer pageSize;
 
-
-    /**
-     * 订单类型（非必传）
-     */
-    private String orderType;
 
     /**
      * 订单号（非必传）
      */
     private String orderNo;
+
+
+    /**
+     * 订单类型（非必传）
+     */
+    private Integer orderType;
+
+
 }

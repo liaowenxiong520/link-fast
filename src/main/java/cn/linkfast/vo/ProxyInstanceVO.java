@@ -17,15 +17,15 @@ public class ProxyInstanceVO implements Serializable {
     private String ip;
     private Integer port;
     private String regionId;
-    private String countryCode;
-    private String cityCode;
+    private String regionName;
     private Integer status;
     private String username;
     private String pwd;
     private String instanceNo;
+    private Integer renew;
     private String orderNo;
     private String productNo;
     private Long userExpired;
+    private String remark;
     private Date createTime;
 }
-

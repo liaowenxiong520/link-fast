@@ -1,0 +1,70 @@
+# For advice on how to change settings please see
+# http://dev.mysql.com/doc/refman/8.0/en/server-configuration-defaults.html
+
+[mysqld]
+#
+# Remove leading # and set to the amount of RAM for the most important data
+# cache in MySQL. Start at 70% of total RAM for dedicated server, else 10%.
+# innodb_buffer_pool_size = 128M
+#
+# Remove the leading "# " to disable binary logging
+# Binary logging captures changes between backups and is enabled by
+# default. It's default setting is log_bin=binlog
+# disable_log_bin
+#
+# Remove leading # to set options mainly useful for reporting servers.
+# The server defaults are faster for transactions and fast SELECTs.
+# Adjust sizes as needed, experiment to find the optimal values.
+# join_buffer_size = 128M
+# sort_buffer_size = 2M
+# read_rnd_buffer_size = 2M
+#
+# Remove leading # to revert to previous value for default_authentication_plugin,
+# this will increase compatibility with older clients. For background, see:
+# https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_default_authentication_plugin
+# default-authentication-plugin=mysql_native_password
+
+datadir=/var/lib/mysql
+socket=/var/lib/mysql/mysql.sock
+
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+
+# ========== 核心：解决连接超时断开 ==========
+# 非交互式连接（JDBC）空闲超时：30分钟（大于Druid的25分钟回收时间）
+wait_timeout = 7200
+# 交互式连接（客户端）空闲超时：与wait_timeout保持一致
+interactive_timeout = 7200
+# 连接建立阶段超时：30秒（高延迟网络适配）
+connect_timeout = 30
+# 读取数据超时：60秒（批量插入读取元数据/反馈超时）
+net_read_timeout = 60
+# 写入数据超时：120秒（批量插入大批次数据超时）
+net_write_timeout = 120
+
+# ========== 连接数配置：避免连接池拿不到连接 ==========
+# 最大连接数：200（默认151，批量插入需扩容）
+max_connections = 200
+# 单用户最大连接数：180（留余量给其他应用）
+max_user_connections = 180
+
+# ========== 批量插入性能优化：减少IO等待，提升速度 ==========
+# 最大数据包大小：64M（避免批量插入大字段时包超限）
+max_allowed_packet = 64M
+# InnoDB缓冲池：根据服务器内存调整（如4G内存设2G，8G内存设4G）
+innodb_buffer_pool_size = 2G
+# 事务日志刷新策略：2=每秒刷盘（提升写入性能，牺牲一点事务安全性；需严格ACID则设1）
+innodb_flush_log_at_trx_commit = 2
+# InnoDB日志文件大小：512M（提升批量写入性能）
+innodb_log_file_size = 512M
+# InnoDB日志缓冲区：64M（适配批量插入）
+innodb_log_buffer_size = 64M
+# 关闭SQL_MODE的严格限制（避免批量插入时因字段长度/空值报错）
+# sql_mode = "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+
+# ========== 通用配置 ==========
+character-set-server = utf8mb4
+collation-server = utf8mb4_general_ci
+# 关闭DNS解析，提升连接速度
+skip-name-resolve
+
