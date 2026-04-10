@@ -1,62 +1,46 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <!-- ===================== 1. 业务代码日志（只记录自己的业务报错） ===================== -->
+    <!-- 日志路径由启动脚本通过 -DLOG_PATH 系统属性设置，默认 ./logs -->
+    <property name="LOG_PATH" value="${LOG_PATH:-./logs}"/>
+
+    <!-- ===================== 1. 业务代码日志（cn.linkfast 包） ===================== -->
     <appender name="BUSINESS" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <!-- 业务日志文件路径（Tomcat日志目录下） -->
-        <file>/usr/local/tomcat10/logs/linkfast-business.log</file>
-        <!-- 按天滚动，保留7天，避免日志过大 -->
+        <file>${LOG_PATH}/linkfast-business.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>/usr/local/tomcat10/logs/linkfast-business.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${LOG_PATH}/linkfast-business.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>7</maxHistory>
         </rollingPolicy>
         <encoder>
-            <!-- 日志格式：时间 + 线程 + 级别 + 类名 + 报错信息（便于定位代码） -->
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
         </encoder>
-        <!-- 只记录业务包（cn.linkfast）的日志 -->
-        <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
-            <evaluator>
-                <expression>logger.startsWith("cn.linkfast")</expression>
-            </evaluator>
-            <OnMatch>ACCEPT</OnMatch>
-            <OnMismatch>DENY</OnMismatch>
-        </filter>
     </appender>
 
-    <!-- ===================== 2. 服务器/其他日志（框架/容器级报错） ===================== -->
+    <!-- ===================== 2. 服务器/框架日志（非 cn.linkfast 包） ===================== -->
     <appender name="SERVER" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <!-- 服务器日志文件路径 -->
-        <file>/usr/local/tomcat10/logs/linkfast-server.log</file>
+        <file>${LOG_PATH}/linkfast-server.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>/usr/local/tomcat10/logs/linkfast-server.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${LOG_PATH}/linkfast-server.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>7</maxHistory>
         </rollingPolicy>
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
         </encoder>
-        <!-- 排除业务包，只记录框架/容器日志（Spring/Tomcat/数据源等） -->
-        <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
-            <evaluator>
-                <expression>!logger.startsWith("cn.linkfast")</expression>
-            </evaluator>
-            <OnMatch>ACCEPT</OnMatch>
-            <OnMismatch>DENY</OnMismatch>
-        </filter>
     </appender>
 
-    <!-- ===================== 3. 控制台输出===================== -->
+    <!-- ===================== 3. 控制台输出 ===================== -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <!-- 核心配置：业务包日志输出到BUSINESS，其他到SERVER，同时都输出到控制台 -->
+    <!-- cn.linkfast 包：只输出到 BUSINESS + 控制台，additivity=false 阻止日志冒泡到 ROOT -->
     <logger name="cn.linkfast" level="INFO" additivity="false">
         <appender-ref ref="BUSINESS"/>
         <appender-ref ref="STDOUT"/>
     </logger>
 
+    <!-- ROOT：其他所有日志（Spring/Tomcat/框架）输出到 SERVER + 控制台 -->
     <root level="INFO">
         <appender-ref ref="SERVER"/>
         <appender-ref ref="STDOUT"/>

@@ -78,4 +78,25 @@ public interface ProxyOrderDAO {
      * @return 实际插入的行数
      */
     int insertProxyRenewOrderItems(ProxyOrder order);
+
+    /**
+     * 将 ProxyOrder 中的 releaseOrderItems 批量插入 proxy_release_order_item 表
+     *
+     * @param order 包含 releaseOrderItems 的订单对象
+     * @return 实际插入的行数
+     */
+    int insertProxyReleaseOrderItems(ProxyOrder order);
+
+    /**
+     * 代理释放业务，回写第三方返回的 orderNo 和 amount（同时更新 proxy_order 和 proxy_release_order_item）
+     */
+    ProxyOrderUpdateResultDTO updateProxyReleaseOrderByAppOrderNo(String appOrderNo, String orderNo, java.math.BigDecimal amount);
+
+    /**
+     * 根据渠道商订单号查询代理购买订单明细列表
+     *
+     * @param appOrderNo 渠道商订单号
+     * @return 购买订单明细列表
+     */
+    List<cn.linkfast.entity.ProxyPurchaseOrderItem> selectPurchaseItemsByAppOrderNo(String appOrderNo);
 }

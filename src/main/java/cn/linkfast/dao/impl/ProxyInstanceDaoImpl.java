@@ -89,9 +89,8 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
 
     @Override
     public List<ProxyInstance> selectListByCondition(ProxyInstanceSearchCondition condition) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM proxy_instance WHERE status = ? ");
+        StringBuilder sql = new StringBuilder("SELECT * FROM proxy_instance WHERE 1=1 ");
         List<Object> params = new ArrayList<>();
-        params.add(condition.getStatus());
 
         appendProxyTypeCondition(sql, params, condition.getProxyType());
         appendOptionalConditions(sql, params, condition);
@@ -105,9 +104,8 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
 
     @Override
     public int countByCondition(ProxyInstanceSearchCondition condition) {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(1) FROM proxy_instance WHERE status = ? ");
+        StringBuilder sql = new StringBuilder("SELECT COUNT(1) FROM proxy_instance WHERE 1=1 ");
         List<Object> params = new ArrayList<>();
-        params.add(condition.getStatus());
 
         appendProxyTypeCondition(sql, params, condition.getProxyType());
         appendOptionalConditions(sql, params, condition);
@@ -131,6 +129,10 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
      * 拼接可选查询条件（列表查询和统计查询共用）
      */
     private void appendOptionalConditions(StringBuilder sql, List<Object> params, ProxyInstanceSearchCondition condition) {
+        if (condition.getStatus() != null) {
+            sql.append("AND status = ? ");
+            params.add(condition.getStatus());
+        }
         if (condition.getCountryCode() != null && !condition.getCountryCode().isEmpty()) {
             sql.append("AND country_code = ? ");
             params.add(condition.getCountryCode());
@@ -143,6 +145,17 @@ public class ProxyInstanceDaoImpl implements ProxyInstanceDAO {
             sql.append("AND ip LIKE ? ");
             params.add("%" + condition.getIp() + "%");
         }
+    }
+
+    /**
+     * 根据实例编号更新备注
+     */
+    @Override
+    public int updateRemarkByInstanceNo(String instanceNo, String remark) {
+        String sql = "UPDATE proxy_instance SET remark = ?, update_time = CURRENT_TIMESTAMP WHERE instance_no = ?";
+        int rows = jdbcTemplate.update(sql, remark, instanceNo);
+        log.info(">>> 更新实例备注，instanceNo: {}，影响行数: {}", instanceNo, rows);
+        return rows;
     }
 
     /**

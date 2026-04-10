@@ -13,10 +13,7 @@ import cn.linkfast.service.ProxyProductService;
 import cn.linkfast.utils.ApiPacketUtil;
 import cn.linkfast.utils.AppOrderNoGenerator;
 import cn.linkfast.utils.HttpClientUtil;
-import cn.linkfast.vo.PayPasswordVO;
-import cn.linkfast.vo.ProxyOrderVO;
-import cn.linkfast.vo.ProxyPurchaseResultVO;
-import cn.linkfast.vo.ProxyRenewResultVO;
+import cn.linkfast.vo.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,6 +55,8 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     private String orderOpenPath;
     @Value("${api.ipv.path.instance_renew}")
     private String instanceRenewPath;
+    @Value("${api.ipv.path.instance_release}")
+    private String instanceReleasePath;
     private String baseUrl; // 动态确定的基础地址
 
     private static @NonNull ProxyOrderSearchCondition buildSearchCondition(@NonNull ProxyOrderQueryDTO queryDto) {
@@ -104,26 +103,31 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         ProxyOrder order = processResponse(responseStr);
         if (order == null) return new ProxyOrderUpdateResultDTO();
 
-        // 将订单的 appOrderNo 赋值给每个实例，确保实例表也关联渠道商订单号
-        if (order.getInstances() != null && order.getAppOrderNo() != null) {
-            for (ProxyInstance instance : order.getInstances()) {
+        // 补全实例的本地字段：appOrderNo / orderId / userId / unit / duration
+        List<ProxyInstance> instances = order.getInstances();
+        if (instances != null && !instances.isEmpty() && order.getAppOrderNo() != null) {
+            // 一次 DB 查询：本地订单（含 id、userId）
+            ProxyOrder localOrder = proxyOrderDAO.selectByAppOrderNo(order.getAppOrderNo());
+            Long localOrderId = localOrder != null ? localOrder.getId() : null;
+            Long localUserId = localOrder != null ? localOrder.getUserId() : null;
+
+            // 一次 DB 查询：购买明细（含 unit、duration），构建 productNo -> item 映射
+            List<ProxyPurchaseOrderItem> purchaseItems = proxyOrderDAO.selectPurchaseItemsByAppOrderNo(order.getAppOrderNo());
+            Map<String, ProxyPurchaseOrderItem> itemByProductNo = (purchaseItems != null ? purchaseItems.stream() : java.util.stream.Stream.<ProxyPurchaseOrderItem>empty()).collect(Collectors.toMap(ProxyPurchaseOrderItem::getProductNo, i -> i, (a, b) -> a));
+
+            // 单次遍历，统一赋值所有本地补全字段
+            for (ProxyInstance instance : instances) {
                 if (instance.getAppOrderNo() == null) {
                     instance.setAppOrderNo(order.getAppOrderNo());
                 }
-            }
-        }
-
-        if (order.getInstances() != null && !order.getInstances().isEmpty()) {
-            // 通过appOrderNo获取本地代理订单
-            ProxyOrder localOrder = proxyOrderDAO.selectByAppOrderNo(order.getAppOrderNo());
-            // 获取代理订单id，赋值给每个实例
-            for (ProxyInstance instance : order.getInstances()) {
-                instance.setOrderId(localOrder.getId());
-            }
-            // 获取 userId 赋值给每个实例
-            if (localOrder != null && localOrder.getUserId() != null) {
-                for (ProxyInstance instance : order.getInstances()) {
-                    instance.setUserId(localOrder.getUserId());
+                if (localOrderId != null) instance.setOrderId(localOrderId);
+                if (localUserId != null) instance.setUserId(localUserId);
+                if (instance.getProductNo() != null) {
+                    ProxyPurchaseOrderItem item = itemByProductNo.get(instance.getProductNo());
+                    if (item != null) {
+                        instance.setUnit(item.getUnit());
+                        instance.setDuration(item.getDuration());
+                    }
                 }
             }
         }
@@ -463,7 +467,14 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
     }
 
     @Transactional(rollbackFor = Exception.class, noRollbackFor = NoRollbackBusinessException.class)
-    public ProxyRenewResultVO renewProxies(List<ProxyRenewItemDTO> items) {
+    public ProxyRenewResultVO renewProxies(ProxyRenewDTO dto) {
+        // 1. 校验支付密码
+        PayPasswordVO payResult = payService.verifyPayPassword(dto.getPayPassword());
+        if (!payResult.getPassed()) {
+            throw new BusinessException(400, payResult.getMessage());
+        }
+
+        List<ProxyRenewItemDTO> items = dto.getItems();
         Long userId = 2032958739262217115L;
         String appOrderNo = appOrderNoGenerator.generateRenewOrderId();
         log.info("成功生成appOrderNo，编号为：{}", appOrderNo);
@@ -658,6 +669,150 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         } catch (Exception e) {
             // 兜底：未预期异常，回滚数据
             throw new BusinessException("续费代理失败，请稍后重试", e);
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = NoRollbackBusinessException.class)
+    public ProxyReleaseResultVO releaseProxies(ProxyReleaseDTO dto) {
+        // 1. 校验支付密码
+        PayPasswordVO payResult = payService.verifyPayPassword(dto.getPayPassword());
+        if (!payResult.getPassed()) {
+            throw new BusinessException(400, payResult.getMessage());
+        }
+
+        List<String> instanceNos = dto.getInstanceNos();
+        Long userId = 2032958739262217115L;
+        String appOrderNo = appOrderNoGenerator.generateReleaseOrderId();
+        log.info("成功生成appOrderNo，编号为：{}", appOrderNo);
+        ProxyOrder order = new ProxyOrder();
+        order.setAppOrderNo(appOrderNo);
+        order.setUserId(userId);
+        order.setOrderType(3);
+        order.setStatus(1);
+        order.setHasRefund(0);
+        order.setTotalQuantity(instanceNos.size());
+        order.setInstanceTotal(instanceNos.size());
+
+        Long orderId = proxyOrderDAO.insertOrder(order);
+        List<ProxyReleaseOrderItem> orderItems = instanceNos.stream().map(instanceNo -> {
+            ProxyReleaseOrderItem item = new ProxyReleaseOrderItem();
+            item.setOrderId(orderId);
+            item.setAppOrderNo(appOrderNo);
+            item.setInstanceNo(instanceNo);
+            return item;
+        }).collect(Collectors.toList());
+        order.setReleaseOrderItems(orderItems);
+        proxyOrderDAO.insertProxyReleaseOrderItems(order);
+
+        Map<String, Object> bizParams = new java.util.HashMap<>();
+        bizParams.put("appOrderNo", appOrderNo);
+        bizParams.put("instances", instanceNos);
+        log.info("请求续费代理业务参数：{}", bizParams);
+
+        try {
+            Map<String, Object> req = apiPacketUtil.pack(bizParams);
+            String url = baseUrl + instanceReleasePath;
+            log.info("释放代理 - 请求URL: {}, 请求参数: {}", url, objectMapper.writeValueAsString(req));
+
+            String resp = null;
+            Exception sendException = null;
+            for (int attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    resp = HttpClientUtil.sendPost(url, req, objectMapper);
+                    sendException = null;
+                    break;
+                } catch (java.net.ConnectException | java.net.UnknownHostException e) {
+                    sendException = e;
+                    log.warn("释放代理 - 第{}次请求连接失败: {}", attempt, e.getMessage());
+                    if (attempt < 3) {
+                        try {
+                            Thread.sleep(1000L * attempt);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("释放代理 - 请求已发送但响应读取失败，appOrderNo: {}", appOrderNo, e);
+                    throw new NoRollbackBusinessException("释放代理请求已发送，但响应读取异常，请联系管理员确认释放结果，appOrderNo: " + appOrderNo, e);
+                }
+            }
+            if (sendException != null) {
+                log.error("释放代理 - 重试3次后仍连接失败，回滚本地数据，appOrderNo: {}", appOrderNo, sendException);
+                throw new BusinessException("释放代理请求失败，请稍后重试", sendException);
+            }
+
+            if (resp == null || resp.isEmpty()) {
+                log.error("释放代理 - 响应为空，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("释放代理响应为空，请联系管理员确认释放结果，appOrderNo: " + appOrderNo);
+            }
+
+            JsonNode root;
+            try {
+                root = objectMapper.readTree(resp);
+            } catch (Exception e) {
+                log.error("释放代理 - 响应非法JSON，appOrderNo: {}, resp: {}", appOrderNo, resp, e);
+                throw new NoRollbackBusinessException("释放代理响应格式异常，请联系管理员确认释放结果，appOrderNo: " + appOrderNo, e);
+            }
+
+            int respCode = root.path("code").asInt(-1);
+            if (respCode != 200) {
+                String msg = root.path("msg").asText("");
+                log.error("释放代理 - 对方返回业务失败, code={}, msg={}, appOrderNo: {}", respCode, msg, appOrderNo);
+                throw new BusinessException("释放失败: " + msg);
+            }
+
+            JsonNode dataJsonNode = root.path("data");
+            if (dataJsonNode.isMissingNode() || dataJsonNode.isNull()) {
+                log.error("释放代理 - data节点缺失，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("释放代理响应data缺失，请联系管理员确认释放结果，appOrderNo: " + appOrderNo);
+            }
+            String encryptedData = dataJsonNode.asText();
+            if (encryptedData.isEmpty()) {
+                log.error("释放代理 - data为空字符串，appOrderNo: {}", appOrderNo);
+                throw new NoRollbackBusinessException("释放代理响应data为空，请联系管理员确认释放结果，appOrderNo: " + appOrderNo);
+            }
+
+            String decryptedJson;
+            try {
+                decryptedJson = apiPacketUtil.unpack(encryptedData);
+            } catch (Exception e) {
+                log.error("释放代理 - 解密失败，appOrderNo: {}", appOrderNo, e);
+                throw new NoRollbackBusinessException("释放代理响应解密失败，请联系管理员确认释放结果，appOrderNo: " + appOrderNo, e);
+            }
+            log.info("释放代理接口返回数据解密成功: {}", decryptedJson);
+
+            String orderNo;
+            java.math.BigDecimal amount;
+            try {
+                JsonNode releaseDataNode = objectMapper.readTree(decryptedJson);
+                JsonNode orderNoNode = releaseDataNode.path("orderNo");
+                if (orderNoNode.isMissingNode() || orderNoNode.isNull() || orderNoNode.asText().isEmpty()) {
+                    throw new IllegalStateException("未获取到orderNo");
+                }
+                orderNo = orderNoNode.asText();
+                JsonNode amountNode = releaseDataNode.path("amount");
+                if (amountNode.isMissingNode() || amountNode.isNull() || amountNode.asText().isEmpty()) {
+                    throw new IllegalStateException("未获取到amount");
+                } else {
+                    amount = new java.math.BigDecimal(amountNode.asText());
+                }
+            } catch (Exception e) {
+                log.error("释放代理 - 解密后数据解析失败，appOrderNo: {}, decryptedJson: {}", appOrderNo, decryptedJson, e);
+                throw new NoRollbackBusinessException("释放代理响应数据解析失败，请联系管理员确认释放结果，appOrderNo: " + appOrderNo, e);
+            }
+
+            proxyOrderDAO.updateProxyReleaseOrderByAppOrderNo(appOrderNo, orderNo, amount);
+
+            ProxyReleaseResultVO vo = new ProxyReleaseResultVO();
+            vo.setOrderNo(orderNo);
+            vo.setAppOrderNo(appOrderNo);
+            vo.setAmount(amount);
+            vo.setStatus(1);
+            return vo;
+        } catch (NoRollbackBusinessException | BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException("释放代理失败，请稍后重试", e);
         }
     }
 

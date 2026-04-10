@@ -12,7 +12,7 @@
            http://www.springframework.org/schema/tx/spring-tx.xsd">
 
     <!-- 数据源配置 -->
-    <context:property-placeholder location="classpath:jdbc.properties,classpath:api.properties" file-encoding="UTF-8"/>
+    <context:property-placeholder location="classpath:jdbc.properties,classpath:api.properties,classpath*:test.properties" file-encoding="UTF-8" ignore-resource-not-found="true"/>
 
     <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" destroy-method="close">
         <property name="driverClassName" value="${jdbc.driver}"/>
@@ -28,22 +28,22 @@
 
         <!-- 连接保活 -->
         <property name="keepAlive" value="true"/>
-        <property name="keepAliveBetweenTimeMillis" value="20001"/>  <!-- 30秒（保活） -->
+        <property name="keepAliveBetweenTimeMillis" value="30001"/>
         <property name="validationQuery" value="SELECT 1"/>          <!-- 轻量检测SQL -->
         <property name="validationQueryTimeout" value="3"/>          <!-- 检测SQL超时时间3秒 -->
 
         <!-- 连接检测策略：性能与可用性平衡 -->
-        <property name="testOnBorrow" value="false"/>   <!-- 关闭获取连接时检测（批量插入性能优先） -->
+        <property name="testOnBorrow" value="true"/>    <!-- 取连接时检测有效性（防止拿到死连接） -->
         <property name="testOnReturn" value="false"/>   <!-- 关闭归还连接时检测 -->
         <property name="testWhileIdle" value="true"/>   <!-- 空闲时检测（核心） -->
 
-        <!-- 空闲连接回收：适配MySQL的wait_timeout -->
-        <property name="timeBetweenEvictionRunsMillis" value="20000"/>  <!-- 30秒检测一次空闲连接 -->
-        <property name="minEvictableIdleTimeMillis" value="1200000"/>   <!-- 25分钟回收（<MySQL的wait_timeout=30分钟） -->
+        <!-- 空闲连接回收：适配MySQL的wait_timeout=7200秒 -->
+        <property name="timeBetweenEvictionRunsMillis" value="30000"/>
+        <property name="minEvictableIdleTimeMillis" value="1800000"/>   <!-- 30分钟回收空闲连接 -->
 
         <!-- 防止连接泄露（批量插入易因代码问题导致连接未释放） -->
         <property name="removeAbandoned" value="true"/>         <!-- 开启泄露连接移除 -->
-        <property name="removeAbandonedTimeout" value="300"/>    <!-- 5分钟未归还的连接视为泄露 -->
+        <property name="removeAbandonedTimeout" value="1800"/>    <!-- 30分钟未归还的连接视为泄露 -->
         <property name="logAbandoned" value="true"/>             <!-- 记录泄露连接日志，便于排查 -->
 
         <!-- 容错配置：避免批量插入时连接获取失败直接中断 -->

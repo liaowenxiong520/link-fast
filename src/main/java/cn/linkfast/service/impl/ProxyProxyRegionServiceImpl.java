@@ -15,7 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ public class ProxyProxyRegionServiceImpl implements ProxyRegionService {
     private final ObjectMapper objectMapper;
     private final ApiPacketUtil apiPacketUtil;
     private final ProxyRegionDAO proxyRegionDAO;
+    private final PlatformTransactionManager transactionManager;
 
     @Value("${api.ipv.env}")
     private String env;
@@ -87,7 +89,7 @@ public class ProxyProxyRegionServiceImpl implements ProxyRegionService {
     public int syncRegionTreeToDb(List<String> codes) throws Exception {
         // 1. 请求第三方「获取地域信息接口」— 放在事务外，避免 HTTP 耗时占用数据库连接
         Map<String, Object> params = new HashMap<>();
-        if (codes != null && !codes.isEmpty()) {
+        if (codes != null) {
             params.put("codes", codes);
         }
         Map<String, Object> finalRequest = apiPacketUtil.pack(params);
@@ -112,20 +114,16 @@ public class ProxyProxyRegionServiceImpl implements ProxyRegionService {
             return 0;
         }
 
-        // 4. 将数据库操作委托给独立的事务方法（短事务），避免长事务占用连接
-        return doSyncToDb(proxyRegionList, regionCodeToParentCode);
-    }
+        // 4. 分两段短事务执行，避免长事务占用连接
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
 
-    /**
-     * 真正执行数据库 upsert 的事务方法。
-     * 拆分出来是为了将事务范围缩小到纯 DB 操作，不包含 HTTP 请求等耗时逻辑。
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public int doSyncToDb(List<ProxyRegion> proxyRegionList, Map<String, String> regionCodeToParentCode) {
         // 4.1 第一次 upsert：region_code 唯一，先把节点写入（parent_id 暂时为 0）
-        int batchModifiedCount = proxyRegionDAO.batchSaveOrUpdate(proxyRegionList);
+        Integer batchModifiedCount = txTemplate.execute(status -> proxyRegionDAO.batchSaveOrUpdate(proxyRegionList));
+        if (batchModifiedCount == null) {
+            throw new BusinessException("地域同步失败：第一次批量写入未返回结果");
+        }
 
-        // 4.2 查询写入后的 id，回填 parent_id
+        // 4.2 事务外查询写入后的 id，回填 parent_id
         List<String> regionCodes = proxyRegionList.stream()
                 .map(ProxyRegion::getRegionCode)
                 .filter(Objects::nonNull)
@@ -149,7 +147,8 @@ public class ProxyProxyRegionServiceImpl implements ProxyRegionService {
         }
 
         // 4.3 第二次 upsert：更新 parent_id
-        proxyRegionDAO.batchSaveOrUpdate(proxyRegionList);
+        txTemplate.executeWithoutResult(status -> proxyRegionDAO.batchSaveOrUpdate(proxyRegionList));
+
         log.info("地域信息批量修改或插入完成，总共处理的地域记录数为 {} 条，第三方获取到的地域条数为 {}", batchModifiedCount, proxyRegionList.size());
         return batchModifiedCount;
     }

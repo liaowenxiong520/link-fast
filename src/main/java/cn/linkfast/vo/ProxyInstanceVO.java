@@ -25,6 +25,8 @@ public class ProxyInstanceVO implements Serializable {
     private Integer renew;
     private String orderNo;
     private String productNo;
+    private Integer unit;         // 购买时的周期单位
+    private Integer duration;     // 购买时的周期时长
     private Long userExpired;
     private String remark;
     private Date createTime;

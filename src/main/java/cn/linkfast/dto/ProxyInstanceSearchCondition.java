@@ -24,28 +24,28 @@ public class ProxyInstanceSearchCondition implements Serializable {
     private Integer limit;
 
     /**
-     * 代理类型（可选，支持多个值；为空或null时不限制）
+     * 代理类型
      */
     private Integer[] proxyType;
 
     /**
-     * 实例状态（必传）
+     * 实例状态
      */
     private Integer status;
 
     /**
-     * 国家代码（可选）
+     * 国家代码
      */
     private String countryCode;
 
     /**
-     * 城市代码（可选）
+     * 城市代码
      */
     private String cityCode;
 
 
     /**
-     * IP地址（可选，模糊查询）
+     * IP地址（模糊查询）
      */
     private String ip;
 }

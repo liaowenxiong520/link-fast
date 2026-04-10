@@ -4,11 +4,13 @@ import cn.linkfast.common.PageResult;
 import cn.linkfast.common.Result;
 import cn.linkfast.dto.ProxyPurchaseDTO;
 import cn.linkfast.dto.ProxyOrderQueryDTO;
-import cn.linkfast.dto.ProxyRenewItemDTO;
+import cn.linkfast.dto.ProxyReleaseDTO;
+import cn.linkfast.dto.ProxyRenewDTO;
 import cn.linkfast.exception.BusinessException;
 import cn.linkfast.service.ProxyOrderService;
 import cn.linkfast.vo.ProxyPurchaseResultVO;
 import cn.linkfast.vo.ProxyOrderVO;
+import cn.linkfast.vo.ProxyReleaseResultVO;
 import cn.linkfast.vo.ProxyRenewResultVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,9 +53,9 @@ public class ProxyOrderController {
      * 续费代理实例
      */
     @PostMapping("/renew")
-    public Result<ProxyRenewResultVO> renewProxies(@RequestBody List<ProxyRenewItemDTO> items) {
+    public Result<ProxyRenewResultVO> renewProxies(@RequestBody @Validated ProxyRenewDTO dto) {
         try {
-            ProxyRenewResultVO vo = proxyOrderService.renewProxies(items);
+            ProxyRenewResultVO vo = proxyOrderService.renewProxies(dto);
             return Result.success(vo);
         } catch (BusinessException e) {
             log.error("续费代理失败: {}", e.getMessage());
@@ -61,6 +63,24 @@ public class ProxyOrderController {
         } catch (Exception e) {
             log.error("续费代理异常", e);
             return Result.error("续费代理失败，请稍后重试");
+        }
+    }
+
+    /**
+     * 释放代理实例
+     */
+    @PostMapping("/release")
+    public Result<ProxyReleaseResultVO> releaseProxies(@RequestBody @Validated ProxyReleaseDTO dto) {
+        log.info("请求释放代理实例: {}", dto.getInstanceNos());
+        try {
+            ProxyReleaseResultVO vo = proxyOrderService.releaseProxies(dto);
+            return Result.success(vo);
+        } catch (BusinessException e) {
+            log.error("释放代理失败: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("释放代理异常", e);
+            return Result.error("释放代理失败，请稍后重试");
         }
     }
 

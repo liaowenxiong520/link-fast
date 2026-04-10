@@ -33,5 +33,14 @@ public interface ProxyInstanceDAO {
      * @return 总条数
      */
     int countByCondition(ProxyInstanceSearchCondition condition);
+
+    /**
+     * 根据实例编号更新备注
+     *
+     * @param instanceNo 平台实例编号
+     * @param remark     备注内容
+     * @return 影响行数
+     */
+    int updateRemarkByInstanceNo(String instanceNo, String remark);
 }
 

@@ -4,10 +4,13 @@ import cn.linkfast.common.PageResult;
 import cn.linkfast.dto.ProxyOrderQueryDTO;
 import cn.linkfast.dto.ProxyOrderUpdateResultDTO;
 import cn.linkfast.dto.ProxyPurchaseDTO;
+import cn.linkfast.dto.ProxyReleaseDTO;
+import cn.linkfast.dto.ProxyRenewDTO;
 import cn.linkfast.dto.ProxyRenewItemDTO;
 import cn.linkfast.exception.NoRollbackBusinessException;
 import cn.linkfast.vo.ProxyOrderVO;
 import cn.linkfast.vo.ProxyPurchaseResultVO;
+import cn.linkfast.vo.ProxyReleaseResultVO;
 import cn.linkfast.vo.ProxyRenewResultVO;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,7 +45,16 @@ public interface ProxyOrderService {
     ProxyOrderVO getOrderByAppOrderNo(String appOrderNo);
 
     @Transactional(rollbackFor = Exception.class, noRollbackFor = NoRollbackBusinessException.class)
-    ProxyRenewResultVO renewProxies(List<ProxyRenewItemDTO> items);
+    ProxyRenewResultVO renewProxies(ProxyRenewDTO dto);
+
+    /**
+     * 释放代理实例
+     *
+     * @param dto 包含支付密码和实例编号列表
+     * @return 释放结果VO
+     */
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = NoRollbackBusinessException.class)
+    ProxyReleaseResultVO releaseProxies(ProxyReleaseDTO dto);
 
     /**
      * 续费代理实例

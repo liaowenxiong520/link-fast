@@ -55,9 +55,9 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
             return new ProxyOrderUpdateResultDTO(proxyOrderUpdatedRows, 0, 0);
         }
 
-        String instSql = "INSERT INTO proxy_instance (order_id,order_no, app_order_no, user_id, instance_no, proxy_type, protocol, ip, port, region_id, country_code, city_code, " + "use_type, username, pwd, user_expired, flow_total, flow_balance, status, renew, bridges, open_at, renew_at, release_at, " + "product_no, extend_ip, project_id) " + "VALUES (?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " + "ON DUPLICATE KEY UPDATE status=VALUES(status), flow_balance=VALUES(flow_balance), user_expired=VALUES(user_expired),renew_at=VALUES(renew_at), release_at=VALUES(release_at)";
+        String instSql = "INSERT INTO proxy_instance (order_id, order_no, app_order_no, user_id, instance_no, proxy_type, protocol, ip, port, region_id, country_code, city_code, " + "use_type,unit,duration,username, pwd, user_expired, flow_total, flow_balance, status, renew, bridges, open_at, renew_at, release_at, " + "product_no, extend_ip, project_id) " + "VALUES (?,?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " + "ON DUPLICATE KEY UPDATE status=VALUES(status), flow_balance=VALUES(flow_balance), user_expired=VALUES(user_expired), renew_at=VALUES(renew_at), release_at=VALUES(release_at)";
 
-        List<Object[]> batchArgs = instances.stream().map(i -> new Object[]{i.getOrderId(), i.getOrderNo(), i.getAppOrderNo(), i.getUserId(), i.getInstanceNo(), i.getProxyType(), i.getProtocol(), i.getIp(), i.getPort(), i.getRegionId(), i.getCountryCode(), i.getCityCode(), i.getUseType(), i.getUsername(), i.getPwd(), i.getUserExpired(), i.getFlowTotal(), i.getFlowBalance(), i.getStatus(), i.getRenew(), toJson(i.getBridges()), i.getOpenAt(), i.getRenewAt(), i.getReleaseAt(), i.getProductNo(), i.getExtendIp(), i.getProjectId()}).collect(Collectors.toList());
+        List<Object[]> batchArgs = instances.stream().map(i -> new Object[]{i.getOrderId(), i.getOrderNo(), i.getAppOrderNo(), i.getUserId(), i.getInstanceNo(), i.getProxyType(), i.getProtocol(), i.getIp(), i.getPort(), i.getRegionId(), i.getCountryCode(), i.getCityCode(), i.getUseType(), i.getUnit(), i.getDuration(),i.getUsername(), i.getPwd(), i.getUserExpired(), i.getFlowTotal(), i.getFlowBalance(), i.getStatus(), i.getRenew(), toJson(i.getBridges()), i.getOpenAt(), i.getRenewAt(), i.getReleaseAt(), i.getProductNo(), i.getExtendIp(), i.getProjectId()}).collect(Collectors.toList());
 
         int[] results = jdbcTemplate.batchUpdate(instSql, batchArgs);
         log.info(">>> 订单 {} 的实例已成功持久化，数量: {}", order.getOrderNo(), instances.size());
@@ -230,11 +230,11 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
         // 2. 获取并保存订单项目数据
         List<ProxyPurchaseOrderItem> items = order.getPurchaseItems();
         if (items != null && !items.isEmpty()) {
-            String itemSql = "INSERT INTO proxy_purchase_order_item (app_order_no, product_no, proxy_type, use_type, protocol, use_limit, " + "area_code, country_code, state_code, city_code, detail, count,cycleTimes,cost_price, retail_price, " + "ip_type, isp_type, net_type, duration, unit, band_width, band_width_price, max_band_width, flow, " + "cpu, memory, supplier_code, ip_count, ip_duration, parent_no, proxy_everytime_change, " + "proxy_global_random,projectId) " + "VALUES (?, ?, ?,?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, ?)";
+            String itemSql = "INSERT INTO proxy_purchase_order_item (app_order_no, product_no, proxy_type, use_type, protocol, use_limit, " + "area_code, country_code, state_code, city_code, detail, count,cycle_times,cost_price, retail_price, " + "ip_type, isp_type, net_type, duration, unit, band_width, band_width_price, max_band_width, flow, " + "cpu, memory, supplier_code, ip_count, ip_duration, parent_no, proxy_everytime_change, " + "proxy_global_random,projectId) " + "VALUES (?, ?, ?,?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, ?)";
 
             List<Object[]> batchArgs = items.stream().map(item -> new Object[]{item.getAppOrderNo(), item.getProductNo(), item.getProxyType(), item.getUseType(), item.getProtocol(), item.getUseLimit(), item.getAreaCode(), item.getCountryCode(), item.getStateCode(), item.getCityCode(), item.getDetail(), item.getCount(),item.getCycleTimes(),item.getCostPrice(), item.getRetailPrice(), item.getIpType(), item.getIspType(), item.getNetType(), item.getDuration(), item.getUnit(), item.getBandWidth(), item.getBandWidthPrice(), item.getMaxBandWidth(), item.getFlow(), item.getCpu(), item.getMemory(), item.getSupplierCode(), item.getIpCount(), item.getIpDuration(), item.getParentNo(), item.getProxyEverytimeChange(), item.getProxyGlobalRandom(), item.getProjectId()}).collect(Collectors.toList());
 
-            int[] results = jdbcTemplate.batchUpdate(itemSql, batchArgs);
+            jdbcTemplate.batchUpdate(itemSql, batchArgs);
             log.info(">>> 订单 {} 的项目已成功新建，数量: {}", order.getAppOrderNo(), items.size());
         }
 
@@ -349,8 +349,62 @@ public class ProxyOrderDaoImpl implements ProxyOrderDAO {
         for (int r : results) {
             if (r > 0) affectedRows++;
         }
-        log.info(">>> proxyPurchaseOrderItem 插入完成，appOrderNo: {}，插入行数: {}", order.getAppOrderNo(), affectedRows);
+        log.info(">>> 订单明细已插入，appOrderNo: {}，插入行数: {}", order.getAppOrderNo(), affectedRows);
         return affectedRows;
+    }
+
+    /**
+     * 根据渠道商订单号查询代理购买订单明细列表
+     */
+    @Override
+    public List<cn.linkfast.entity.ProxyPurchaseOrderItem> selectPurchaseItemsByAppOrderNo(String appOrderNo) {
+        String sql = "SELECT * FROM proxy_purchase_order_item WHERE app_order_no = ?";
+        return jdbcTemplate.query(sql, new BeanPropertyRowMapper<>(cn.linkfast.entity.ProxyPurchaseOrderItem.class), appOrderNo);
+    }
+
+    /**
+     * 将 ProxyOrder 中的 releaseOrderItems 批量插入 proxy_release_order_item 表
+     */
+    @Override
+    public int insertProxyReleaseOrderItems(ProxyOrder order) {
+        List<cn.linkfast.entity.ProxyReleaseOrderItem> items = order.getReleaseOrderItems();
+        if (items == null || items.isEmpty()) {
+            log.warn(">>> releaseOrderItems 为空，跳过插入，appOrderNo: {}", order.getAppOrderNo());
+            return 0;
+        }
+        String sql = "INSERT INTO proxy_release_order_item "
+                + "(order_id, order_no, app_order_no, instance_no, total_amount, create_time, update_time) "
+                + "VALUES (?, ?, ?, ?, ?, NOW(), NOW())";
+        List<Object[]> batchArgs = items.stream().map(item -> new Object[]{
+                item.getOrderId(),
+                item.getOrderNo(),
+                item.getAppOrderNo(),
+                item.getInstanceNo(),
+                item.getTotalAmount()
+        }).collect(Collectors.toList());
+        int[] results = jdbcTemplate.batchUpdate(sql, batchArgs);
+        int affectedRows = 0;
+        for (int r : results) {
+            if (r > 0) affectedRows++;
+        }
+        log.info(">>> proxyReleaseOrderItem 插入完成，appOrderNo: {}，插入行数: {}", order.getAppOrderNo(), affectedRows);
+        return affectedRows;
+    }
+
+    /**
+     * 代理释放业务，回写第三方返回的 orderNo 和 amount（同时更新 proxy_order 和 proxy_release_order_item）
+     */
+    @Override
+    public ProxyOrderUpdateResultDTO updateProxyReleaseOrderByAppOrderNo(String appOrderNo, String orderNo, java.math.BigDecimal amount) {
+        String orderSql = "UPDATE proxy_order SET order_no=?, amount=? WHERE app_order_no=?";
+        int orderUpdatedRows = jdbcTemplate.update(orderSql, orderNo, amount, appOrderNo);
+        log.info(">>> 回写代理释放订单表，appOrderNo: {}，orderNo: {}，影响行数: {}", appOrderNo, orderNo, orderUpdatedRows);
+
+        String itemSql = "UPDATE proxy_release_order_item SET order_no=? WHERE app_order_no=?";
+        int orderItemUpdatedRows = jdbcTemplate.update(itemSql, orderNo, appOrderNo);
+        log.info(">>> 回写代理释放订单明细表，appOrderNo: {}，orderNo: {}，影响行数: {}", appOrderNo, orderNo, orderItemUpdatedRows);
+
+        return new ProxyOrderUpdateResultDTO(orderUpdatedRows, 0, orderItemUpdatedRows);
     }
 
     /**

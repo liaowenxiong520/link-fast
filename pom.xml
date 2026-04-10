@@ -16,6 +16,7 @@
         <jakarta.servlet.version>6.0.0</jakarta.servlet.version>
         <spring.version>6.2.13</spring.version>
         <jackson.version>2.18.2</jackson.version>
+        <skipITs>false</skipITs>
     </properties>
 
     <dependencies>
@@ -247,6 +248,29 @@
                 <configuration>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
                 </configuration>
+            </plugin>
+            <!-- 集成测试插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <!-- 指定集成测试类 -->
+                    <includes>
+                        <include>**/*IT.java</include>
+                        <include>**/*ITCase.java</include>
+                    </includes>
+                    <!-- 可选：跳过集成测试 -->
+                    <skipTests>${skipITs}</skipTests>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

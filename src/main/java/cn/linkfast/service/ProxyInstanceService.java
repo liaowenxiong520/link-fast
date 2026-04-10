@@ -24,5 +24,13 @@ public interface ProxyInstanceService {
      * @return 分页VO结果
      */
     PageResult<ProxyInstanceVO> queryProxyInstances(ProxyInstanceQueryDTO queryDto);
+
+    /**
+     * 更新代理实例备注
+     *
+     * @param instanceNo 平台实例编号
+     * @param remark     备注内容
+     */
+    void updateRemark(String instanceNo, String remark);
 }
 

@@ -16,11 +16,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 地域数据访问实现类
- * 对应表：region
+ * 对应表：proxy_region
  */
 @Slf4j
 @Repository
@@ -107,15 +106,22 @@ public class ProxyRegionDaoImpl implements ProxyRegionDAO {
             return Collections.emptyMap();
         }
 
-        String placeholders = String.join(",", Collections.nCopies(regionCodes.size(), "?"));
-        String sql = "SELECT id, region_code FROM region WHERE region_code IN (" + placeholders + ")";
+        Map<String, Long> idMap = new java.util.HashMap<>();
+        for (int from = 0; from < regionCodes.size(); from += BATCH_CHUNK_SIZE) {
+            int to = Math.min(from + BATCH_CHUNK_SIZE, regionCodes.size());
+            List<String> chunkCodes = regionCodes.subList(from, to);
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, regionCodes.toArray());
-        return rows.stream().collect(Collectors.toMap(
-                m -> (String) m.get("region_code"),
-                m -> ((Number) m.get("id")).longValue(),
-                (a, b) -> a
-        ));
+            String placeholders = String.join(",", Collections.nCopies(chunkCodes.size(), "?"));
+            String sql = "SELECT id, region_code FROM proxy_region WHERE region_code IN (" + placeholders + ")";
+
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, chunkCodes.toArray());
+            rows.forEach(m -> idMap.put(
+                    (String) m.get("region_code"),
+                    ((Number) m.get("id")).longValue()
+            ));
+        }
+
+        return idMap;
     }
 
     @Override

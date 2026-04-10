@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = {AppConfig.class})
-public class ProxyProxyProxyRegionServiceImplTest {
+public class ProxyRegionServiceImplTest {
 
     @Autowired
     private ProxyRegionService proxyRegionService;

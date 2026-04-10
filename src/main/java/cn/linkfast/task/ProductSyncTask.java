@@ -3,6 +3,7 @@ package cn.linkfast.task;
 import cn.linkfast.service.ProxyProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -24,12 +25,19 @@ public class ProductSyncTask {
     // final 修饰的字段会被 Lombok 自动纳入构造函数中，实现完美注入
     private final ProxyProductService proxyProductService;
 
+    @Value("${task.product-sync.enabled:true}")
+    private boolean enabled;
+
     /**
      * 定时同步任务：每隔 30 分钟执行一次
      * Cron 表达式（Spring 6 域）：秒 分 时 日 月 周
      */
     @Scheduled(cron = "0 0/30 * * * *")
     public void executeSyncJob() {
+        if (!enabled) {
+            log.info("[定时任务] 产品同步已禁用，跳过执行");
+            return;
+        }
         log.info("============== [定时任务] 开始同步第三方代理产品数据 ==============");
         // 1. 根据文档要求构造参数：proxyType 是必填的 []int 类型
         Map<String, Object> params = new HashMap<>();
@@ -60,6 +68,10 @@ public class ProductSyncTask {
      */
     @Scheduled(initialDelay = 5000, fixedDelay = Long.MAX_VALUE)
     public void runInitialSync() {
+        if (!enabled) {
+            log.info("[启动检查] 产品同步已禁用，跳过初始化同步");
+            return;
+        }
         log.info(">>> [启动检查] 正在执行系统初始化产品同步...");
         // 1. 根据文档要求构造参数：proxyType 是必填的 []int 类型
         Map<String, Object> params = new HashMap<>();

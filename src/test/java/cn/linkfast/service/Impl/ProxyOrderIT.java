@@ -34,7 +34,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = {AppConfig.class}) // 直接加载你的核心配置类
 //@Transactional // 保证测试入库后自动回滚，不产生垃圾数据
-public class ProxyOrderIntegrationTest {
+public class ProxyOrderIT {
 
     // 手动 Mock 解密工具，跳过复杂的加密算法
     private final ApiPacketUtil apiPacketUtil = mock(ApiPacketUtil.class);

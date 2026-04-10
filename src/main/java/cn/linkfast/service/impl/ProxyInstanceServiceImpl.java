@@ -89,6 +89,7 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
 
     @Override
     public PageResult<ProxyInstanceVO> queryProxyInstances(ProxyInstanceQueryDTO queryDto) {
+        log.info("Service层开始查询代理实例列表，查询条件：{}", queryDto);
         // 1. DTO 转 SearchCondition（计算 offset）
         ProxyInstanceSearchCondition condition = buildSearchCondition(queryDto);
 
@@ -146,6 +147,14 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
             vo.setRegionName(regionName.toString());
         }
         return vo;
+    }
+
+    @Override
+    public void updateRemark(String instanceNo, String remark) {
+        int rows = proxyInstanceDAO.updateRemarkByInstanceNo(instanceNo, remark);
+        if (rows == 0) {
+            throw new cn.linkfast.exception.BusinessException(400, "实例不存在: " + instanceNo);
+        }
     }
 
     /**

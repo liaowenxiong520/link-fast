@@ -40,4 +40,6 @@ public class ProxyOrder {
     private List<ProxyPurchaseOrderItem> purchaseItems;
     // 封装代理续费订单的续费明细
     private List<ProxyRenewOrderItem> renewItems;
+    // 封装代理释放订单的释放明细
+    private List<ProxyReleaseOrderItem> releaseOrderItems;
 }

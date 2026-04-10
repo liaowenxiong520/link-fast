@@ -45,6 +45,8 @@ public class ProxyInstance {
     private String productNo;     // 产品编号
     private String extendIp;      // 扩展地址
     private String projectId;     // 项目code
+    private Integer unit;         // 购买时的周期单位
+    private Integer duration;     // 购买时的周期时长
     private String remark;
     private Date createTime;      // 创建时间，非空
     private Date updateTime;      // 更新时间，非空

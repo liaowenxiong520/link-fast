@@ -1,6 +1,7 @@
 package cn.linkfast.common;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -11,6 +12,7 @@ import java.util.List;
  * @param <T> 具体的数据类型，通常是 VO 对象
  */
 @Data
+@NoArgsConstructor
 public class PageResult<T> implements Serializable {
 
     @Serial

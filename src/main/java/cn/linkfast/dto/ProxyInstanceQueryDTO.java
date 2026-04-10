@@ -1,11 +1,11 @@
 package cn.linkfast.dto;
 
-import lombok.Data;
-
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
 import java.io.Serial;
 import java.io.Serializable;
 
@@ -18,15 +18,13 @@ public class ProxyInstanceQueryDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 代理类型（必传，支持多个值）
+     * 代理类型（可选，支持多个值）
      */
-    @NotEmpty(message = "代理类型proxyType不能为空")
     private Integer[] proxyType;
 
     /**
-     * 实例状态（必传）
+     * 实例状态（可选）
      */
-    @NotNull(message = "实例状态status不能为空")
     private Integer status;
 
     /**
