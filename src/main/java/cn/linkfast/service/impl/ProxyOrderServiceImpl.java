@@ -309,7 +309,7 @@ public class ProxyOrderServiceImpl implements ProxyOrderService {
         order.setPurchaseItems(items);
         // 再存储订单明细数据
         proxyOrderDAO.insertProxyPurchaseOrderItems(order);
-        String orderNo = null;
+        String orderNo;
         BigDecimal amount = null;
 
         // 构建第三方API业务参数
