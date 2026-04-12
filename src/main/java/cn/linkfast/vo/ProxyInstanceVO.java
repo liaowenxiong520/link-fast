@@ -16,8 +16,14 @@ public class ProxyInstanceVO implements Serializable {
 
     private String ip;
     private Integer port;
+    // 洲的编号
     private String regionId;
-    private String regionName;
+    // 国家编码
+    private String countryCode;
+    // 城市编码
+    private String cityCode;
+    // 地域全称
+    private String fullRegionName;
     private Integer status;
     private String username;
     private String pwd;
@@ -25,8 +31,10 @@ public class ProxyInstanceVO implements Serializable {
     private Integer renew;
     private String orderNo;
     private String productNo;
-    private Integer unit;         // 购买时的周期单位
-    private Integer duration;     // 购买时的周期时长
+    // 购买时的周期单位
+    private Integer unit;
+    // 购买时的周期时长
+    private Integer duration;
     private Long userExpired;
     private String remark;
     private Date createTime;

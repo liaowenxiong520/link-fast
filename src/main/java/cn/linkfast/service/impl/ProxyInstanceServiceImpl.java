@@ -130,21 +130,21 @@ public class ProxyInstanceServiceImpl implements ProxyInstanceService {
         BeanUtils.copyProperties(entity, vo);
 
         // 拼接地域中文名：国家-城市（有值则拼，无则跳过）
-        StringBuilder regionName = new StringBuilder();
+        StringBuilder fullRegionName = new StringBuilder();
         if (entity.getCountryCode() != null && !entity.getCountryCode().isEmpty()) {
             ProxyRegion country = proxyRegionDAO.selectByRegionCode(entity.getCountryCode());
-            regionName.append(country != null ? country.getRegionName() : entity.getCountryCode());
+            fullRegionName.append(country != null ? country.getRegionName() : entity.getCountryCode());
         }
         if (entity.getCityCode() != null && !entity.getCityCode().isEmpty()) {
             ProxyRegion city = proxyRegionDAO.selectByRegionCode(entity.getCityCode());
             String cityName = city != null ? city.getRegionName() : entity.getCityCode();
-            if (!regionName.isEmpty()) {
-                regionName.append("-");
+            if (!fullRegionName.isEmpty()) {
+                fullRegionName.append("-");
             }
-            regionName.append(cityName);
+            fullRegionName.append(cityName);
         }
-        if (!regionName.isEmpty()) {
-            vo.setRegionName(regionName.toString());
+        if (!fullRegionName.isEmpty()) {
+            vo.setFullRegionName(fullRegionName.toString());
         }
         return vo;
     }
